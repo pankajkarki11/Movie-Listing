@@ -58,7 +58,7 @@ Table.Row = ({ children, className = "", hover = true, ...props }) => (
 Table.Cell = ({ children, className = "", ...props }) => (
   <td
     className={`
-      px-6 py-4 whitespace-normal text-sm 
+      px-6 py-4 whitespace-normal  
       text-gray-900 border-r border-gray-100
       ${className}
     `}//whitespace-nowrap prevents the text from wrapping to the next line like john doe is large name if we dont use this we can see john in one line and doe in the next which is not good looking so we use whitespace-nowrap which makes john doe appers in same line
