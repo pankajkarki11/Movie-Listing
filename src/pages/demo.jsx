@@ -40,8 +40,8 @@ const List = () => {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (movie) =>
-          movie.title.toLowerCase()?.includes(searchLower) ||
-          movie.overview.toLowerCase()?.includes(searchLower),
+          movie.title?.toLowerCase().includes(searchLower) ||
+          movie.overview?.toLowerCase().includes(searchLower),
       );
     }
 
@@ -58,11 +58,10 @@ const List = () => {
     filterMovies();
   }, [searchTerm, selectedGenre, allMovies]);
 
-
-  const clearFilter=()=>{
+  const clearFilter = () => {
     setSearchTerm("");
     setSelectedGenre("all");
-  }
+  };
 
   const itemsPerView = 6;
   const itemSize = 80; //px
@@ -86,78 +85,97 @@ const List = () => {
 
   return (
     <div className="flex-col justify-center items-center bg-gray-100">
-     <div className="flex text-3xl justify-center ">Movie Listing</div>
-      <div className="flex items-center justify-center ">
+      <div className="flex text-3xl justify-center mb-4">Movie Listing</div>
+
+      <div className="flex items-center justify-center flex-wrap gap-4 mb-4">
         <Input
-          className="mr-20 w-90 h-10 border-3 border-lg border-blue-500 rounded-lg "
-        label="Search"
+          className="w-80 h-10 border-2 border-blue-500 rounded-lg px-4"
+          label="Search"
           type="text"
           placeholder="Search by title or overview"
-          
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-          }}
+          onChange={(e) => setSearchTerm(e.target.value)}
           value={searchTerm}
+          aria-label="Search movies"
         />
 
         <select
-          className="m-12 w-60 h-10 border-3 border-lg border-gray-500 rounded-lg "
+          className="w-60 h-10 border-2 border-gray-500 rounded-lg px-4"
           value={selectedGenre}
           onChange={(e) => setSelectedGenre(e.target.value)}
+          aria-label="Filter by genre"
         >
-          <option value="all">All Genre</option>
-
+          <option value="all">All Genres</option>
           {allGenres.map((genre, idx) => (
             <option key={idx} value={genre}>
               {genre}
             </option>
           ))}
         </select>
-        <button className="m-2 p-2 border-2 bg-gray-300 rounded-full hover:bg-gray-500"
-        onClick={()=>{clearFilter()}}
+
+        <button
+          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-400 transition-colors"
+          onClick={clearFilter}
         >
-            
-            Clear Filter
+          Clear Filter
         </button>
       </div>
       {loading ? (
         <p>loading...</p>
       ) : (
         <div
-          className="overflow-auto"
+          className="overflow-auto h-[90vh] md:h-[90vh] lg:h-[80vh]"
           onScroll={scrollabe}
-          style={{ height: "600px" }}
         >
           <div style={{ height: `${totalHeight}px`, position: "relative" }}>
             <div style={{ transform: `translateY(${offsetY}px)` }}>
               <Table>
                 <Table.Header>
-                  <Table.HeaderCell>id</Table.HeaderCell>
+                  <Table.HeaderCell className="hidden sm:table-cell">
+                    id
+                  </Table.HeaderCell>
                   <Table.HeaderCell>title</Table.HeaderCell>
-                  <Table.HeaderCell>release_date</Table.HeaderCell>
-                  <Table.HeaderCell> Genre</Table.HeaderCell>
+                  <Table.HeaderCell className="hidden md:table-cell">
+                    release_date
+                  </Table.HeaderCell>
+                  <Table.HeaderCell className="hidden lg:table-cell">
+                    Genre
+                  </Table.HeaderCell>
                   <Table.HeaderCell>Overview</Table.HeaderCell>
                 </Table.Header>
 
-                {visibleMovies.map((movie, id) => (
-                  <Table.Body>
-                    <Table.Row key={id}>
-                      <Table.Cell>
-                        <img src={movie.poster} className="h-30 w-70" />
+                <Table.Body>
+                  {visibleMovies.map((movie) => (
+                    <Table.Row key={movie.id}>
+                      <Table.Cell className="hidden sm:table-cell ">
+                        <div className="flex h-20 w-20">
+                          <img
+                            src={movie.poster}
+                            alt={`${movie.title} poster`}
+                          />
+                        </div>
                         ID: {movie.id}
                       </Table.Cell>
-                      <Table.Cell>{movie.title}</Table.Cell>
+                      <Table.Cell className="text-lg">
+                         <img className="sm:hidden"
+                            src={movie.poster}
+                            alt={`${movie.title} poster`}
+                            
+                          />
+                          {movie.title}
 
-                      <Table.Cell>
-                        {new Date(
-                          movie.release_date * 1000,
-                        ).toLocaleDateString("en-CA")}
+
                       </Table.Cell>
-                      <Table.Cell>
+
+                      <Table.Cell className="hidden md:table-cell">
+                        {new Date(movie.release_date * 1000).toLocaleDateString(
+                          "en-CA",
+                        )}
+                      </Table.Cell>
+                      <Table.Cell className="hidden lg:table-cell">
                         {movie.genres.map((genre, index) => (
                           <div
                             key={index}
-                            className="bg-gray-200 text-gray-800 px-2 py-1 rounded mr-1 mb-1 text-xs"
+                            className="bg-gray-200 text-gray-800 px-2 py-1 rounded-sm mr-1 mb-2 text-xs"
                           >
                             {genre}
                           </div>
@@ -165,8 +183,8 @@ const List = () => {
                       </Table.Cell>
                       <Table.Cell>{movie.overview}</Table.Cell>
                     </Table.Row>
-                  </Table.Body>
-                ))}
+                  ))}
+                </Table.Body>
               </Table>
             </div>
           </div>
