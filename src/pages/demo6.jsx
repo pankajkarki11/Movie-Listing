@@ -21,6 +21,15 @@ const List = () => {
 
   const listRef = useRef(null);
 
+  const columnWidths = {
+    index: "80px",
+    id: "150px",
+    title: "250px",
+    date: "150px",
+    genre: "200px",
+    overview: "auto",
+  };
+
   const fetchMovies = async () => {
     setLoading(true);
     try {
@@ -209,44 +218,6 @@ const List = () => {
 
   const virtualItems = rowVirtualizer.getVirtualItems();
 
-  // // FIXED: Better scrolling calculations
-  // const itemSize = 130;
-  // const bufferItems = 15; // Reduced buffer for better performance
-
-  // // Calculate total height more accurately
-  // const totalHeight = useMemo(() => {
-  //   return filteredMovies.length * itemSize;
-  // }, [filteredMovies.length, itemSize]);
-
-  // // FIXED: Better viewport calculations
-  // const { visibleMovies, offsetY } = useMemo(() => {
-  //   const containerHeight = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 800;
-
-  //   const startIndex = Math.max(
-  //     0,
-  //     Math.floor(scrollTop / itemSize) - bufferItems,
-  //   );
-
-  //   const visibleCount = Math.ceil(containerHeight / itemSize);
-  //   const endIndex = Math.min(
-  //     filteredMovies.length,
-  //     startIndex + visibleCount + (bufferItems * 2)
-  //   );
-
-  //   return {
-  //     visibleMovies: filteredMovies.slice(startIndex, endIndex),
-  //     offsetY: startIndex * itemSize
-  //   };
-  // }, [filteredMovies, scrollTop, itemSize, bufferItems]);
-
-  // // FIXED: Throttled scroll handler
-  // const scrollabe = useCallback((e) => {
-  //   const newScrollTop = e.target.scrollTop;
-  //   requestAnimationFrame(() => {
-  //     setScrollTop(newScrollTop);
-  //   });
-  // }, []);
-
   return (
     <div className="flex-col justify-center items-center bg-gray-100 min-h-screen">
       <div className="flex text-3xl justify-center mb-4 pt-4">
@@ -322,101 +293,131 @@ const List = () => {
               position: "relative",
             }}
           >
-            {virtualItems.map((virtualItem) => {
-              const movie = filteredMovies[virtualItem.index];
-              return (
-                <div
-                key={movie.id}
-                data-index={virtualItem.index}
-                ref={rowVirtualizer.measureElement}
-                  style={{
-                    position: "absolute",
-                    width: "100%",
-                    transform: `translateY(${virtualItem.start}px)`,
-                    
-                  }}
+            <Table>
+              <Table.Header>
+                <Table.HeaderCell
+                  className="hidden sm:table-cell"
+                  width={columnWidths.index}
                 >
-                  <Table>
-                    <Table.Header>
-                      <Table.HeaderCell className="hidden sm:table-cell">
-                        Index
-                      </Table.HeaderCell>
-                      <Table.HeaderCell className="hidden sm:table-cell">
-                        ID
-                      </Table.HeaderCell>
-                      <Table.HeaderCell>Title</Table.HeaderCell>
-                      <Table.HeaderCell className="hidden md:table-cell">
-                        Release Date
-                      </Table.HeaderCell>
-                      <Table.HeaderCell className="hidden lg:table-cell">
-                        Genre
-                      </Table.HeaderCell>
-                      <Table.HeaderCell>Overview</Table.HeaderCell>
-                    </Table.Header>
+                  Index
+                </Table.HeaderCell>
+                <Table.HeaderCell
+                  className="hidden sm:table-cell"
+                  width={columnWidths.id}
+                >
+                  ID
+                </Table.HeaderCell>
+                <Table.HeaderCell width={columnWidths.title}>
+                  Title
+                </Table.HeaderCell>
+                <Table.HeaderCell
+                  className="hidden md:table-cell"
+                  width={columnWidths.date}
+                >
+                  Release Date
+                </Table.HeaderCell>
+                <Table.HeaderCell
+                  className="hidden lg:table-cell"
+                  width={columnWidths.genre}
+                >
+                  Genre
+                </Table.HeaderCell>
+                <Table.HeaderCell width={columnWidths.overview}>
+                  Overview
+                </Table.HeaderCell>
+              </Table.Header>
 
-                    <Table.Body>
-                      {isVisible && (
-                        <Table.Row>
-                          <Table.Cell className="hidden sm:table-cell"></Table.Cell>
-                          <Table.Cell className="hidden sm:table-cell">
-                            <Input
-                              placeholder="Id..."
-                              label="Search By ID"
-                              type="number"
-                              onChange={(e) => setSearchId(e.target.value)}
-                              value={searchId}
-                            />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Input
-                              placeholder="Search Title..."
-                              type="text"
-                              label="Search By Title"
-                              onChange={(e) => setSearchTitle(e.target.value)}
-                              value={searchTitle}
-                            />
-                          </Table.Cell>
-                          <Table.Cell className="hidden md:table-cell">
-                            <Input
-                              placeholder="Date..."
-                              label="YYYY-MM"
-                              type="text"
-                              onChange={(e) =>
-                                setSearchReleaseDate(e.target.value)
-                              }
-                              value={searchReleaseDate}
-                            />
-                          </Table.Cell>
-                          <Table.Cell className="hidden lg:table-cell">
-                            <Input
-                              placeholder="Action..."
-                              type="text"
-                              label="Search By Genre"
-                              onChange={(e) => setSearchGenres(e.target.value)}
-                              value={searchGenres}
-                            />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Input
-                              placeholder="Search Overview"
-                              type="text"
-                              label="Search By Overview"
-                              onChange={(e) =>
-                                setSearchOverview(e.target.value)
-                              }
-                              value={searchOverview}
-                            />
-                          </Table.Cell>
-                        </Table.Row>
-                      )}
-
-                      <Table.Row key={movie.id}>
-                        <Table.Cell className="hidden sm:table-cell">
+              <Table.Body>
+                {isVisible && (
+                  <Table.Row>
+                    <Table.Cell
+                      className="hidden sm:table-cell"
+                      width={columnWidths.index}
+                    ></Table.Cell>
+                    <Table.Cell
+                      className="hidden sm:table-cell"
+                      width={columnWidths.id}
+                    >
+                      <Input
+                        placeholder="Id..."
+                        label="Search By ID"
+                        type="number"
+                        onChange={(e) => setSearchId(e.target.value)}
+                        value={searchId}
+                      />
+                    </Table.Cell>
+                    <Table.Cell width={columnWidths.title}>
+                      <Input
+                        placeholder="Search Title..."
+                        type="text"
+                        label="Search By Title"
+                        onChange={(e) => setSearchTitle(e.target.value)}
+                        value={searchTitle}
+                      />
+                    </Table.Cell>
+                    <Table.Cell
+                      className="hidden md:table-cell"
+                      width={columnWidths.date}
+                    >
+                      <Input
+                        placeholder="Date..."
+                        label="YYYY-MM"
+                        type="text"
+                        onChange={(e) => setSearchReleaseDate(e.target.value)}
+                        value={searchReleaseDate}
+                      />
+                    </Table.Cell>
+                    <Table.Cell
+                      className="hidden lg:table-cell"
+                      width={columnWidths.genre}
+                    >
+                      <Input
+                        placeholder="Action..."
+                        type="text"
+                        label="Search By Genre"
+                        onChange={(e) => setSearchGenres(e.target.value)}
+                        value={searchGenres}
+                      />
+                    </Table.Cell>
+                    <Table.Cell width={columnWidths.overview}>
+                      <Input
+                        placeholder="Search Overview"
+                        type="text"
+                        label="Search By Overview"
+                        onChange={(e) => setSearchOverview(e.target.value)}
+                        value={searchOverview}
+                      />
+                    </Table.Cell>
+                  </Table.Row>
+                )}
+                {virtualItems.map((virtualItem) => {
+                  const movie = filteredMovies[virtualItem.index];
+                  return (
+                    <div
+                      key={movie.id}
+                      data-index={virtualItem.index}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: "absolute",
+                        width: "100%",
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <Table.Row className="border-b border-gray-200 ">
+                        <Table.Cell
+                          className="hidden sm:table-cell"
+                          width={columnWidths.index}
+                        >
                           {virtualItem.index + 1}
                         </Table.Cell>
 
-                        <Table.Cell className="hidden sm:table-cell">
-                          <div className="flex h-20 w-20">
+                        <Table.Cell
+                          className="hidden sm:table-cell  flex items-center justify-center"
+                          width={columnWidths.id}
+
+                        >
+
+                          <div className="flex h-20 w-20  justify-between">
                             <img
                               src={movie.poster}
                               alt={`${movie.title} poster`}
@@ -425,7 +426,10 @@ const List = () => {
                           </div>
                           ID: {movie.id}
                         </Table.Cell>
-                        <Table.Cell className="text-lg">
+                        <Table.Cell
+                          className="text-lg"
+                          width={columnWidths.title}
+                        >
                           <img
                             className="sm:hidden h-20 w-20"
                             src={movie.poster}
@@ -435,12 +439,18 @@ const List = () => {
                           {movie.title}
                         </Table.Cell>
 
-                        <Table.Cell className="hidden md:table-cell">
+                        <Table.Cell
+                          className="hidden md:table-cell"
+                          width={columnWidths.date}
+                        >
                           {new Date(
                             movie.release_date * 1000,
                           ).toLocaleDateString("en-CA")}
                         </Table.Cell>
-                        <Table.Cell className="hidden lg:table-cell">
+                        <Table.Cell
+                          className="hidden lg:table-cell"
+                          width={columnWidths.genre}
+                        >
                           <div className="flex flex-wrap gap-1">
                             {movie.genres.map((genre, idx) => (
                               <div
@@ -452,13 +462,15 @@ const List = () => {
                             ))}
                           </div>
                         </Table.Cell>
-                        <Table.Cell>{movie.overview}</Table.Cell>
+                        <Table.Cell width={columnWidths.overview}>
+                          {movie.overview}
+                        </Table.Cell>
                       </Table.Row>
-                    </Table.Body>
-                  </Table>
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </Table.Body>
+            </Table>
           </div>
         </div>
       )}

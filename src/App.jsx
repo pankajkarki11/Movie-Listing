@@ -4,7 +4,7 @@ import{Route,Routes} from 'react-router-dom'
 // import List from './pages/demo'
 // import MovieListing from './pages/demo2'
 // import List from './pages/demo3'
-import List from './pages/demo3'
+import List from './pages/demo6'
 
 function App() {
   return (

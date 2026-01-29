@@ -22,14 +22,15 @@ Table.Header = ({ children, className = "" }) => (
   </thead>
 );
 
-Table.HeaderCell = ({ children, className = "", ...props }) => (
+Table.HeaderCell = ({ children, className = "", width, ...props }) => (
   <th
     className={`
       px-6 py-3 text-left text-xs font-medium 
       text-gray-500 border-r border-gray-200
       uppercase tracking-wider
       ${className}
-    `}//px and py are horizontal and vertical padding which add space between the text and the border in both direction equally//tracking-wider adds more space between letters,more breating room 
+    `}
+    style={{ width: width || 'auto' }}
     {...props}
   >
     {children}
@@ -55,13 +56,14 @@ Table.Row = ({ children, className = "", hover = true, ...props }) => (
   </tr>
 );
 
-Table.Cell = ({ children, className = "", ...props }) => (
+Table.Cell = ({ children, className = "", width, ...props }) => (
   <td
     className={`
       px-6 py-4 whitespace-normal 
       text-gray-900 border-r border-gray-100
       ${className}
-    `}//whitespace-nowrap prevents the text from wrapping to the next line like john doe is large name if we dont use this we can see john in one line and doe in the next which is not good looking so we use whitespace-nowrap which makes john doe appers in same line
+    `}
+    style={{ width: width || 'auto' }}
     {...props}
   >
     {children}
