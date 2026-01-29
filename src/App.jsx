@@ -1,9 +1,10 @@
 import './App.css'
 import{Route,Routes} from 'react-router-dom'
 // import MovieListing from './pages/Listing'    
-import List from './pages/demo'
+// import List from './pages/demo'
 // import MovieListing from './pages/demo2'
 // import List from './pages/demo3'
+import List from './pages/demo3'
 
 function App() {
   return (

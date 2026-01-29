@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Table from "./Table";
 import Input from "./Input";
 
@@ -30,9 +30,9 @@ const List = () => {
     fetchMovies();
   }, []);
 
-  const allGenres = [
+  const allGenres = useMemo(() => [
     ...new Set(allMovies.flatMap((movie) => movie.genres || [])),
-  ];
+  ], [allMovies]);
 
   const filterMovies = () => {
     let filtered = [...allMovies];
@@ -121,7 +121,7 @@ const List = () => {
       </div>
       {loading ? (
         <p>loading...</p>
-      ) : (
+      ) : ((error && <p>{error.message}</p>) || 
         <div
           className="overflow-auto h-[90vh] md:h-[90vh] lg:h-[80vh]"
           onScroll={scrollabe}
@@ -130,6 +130,7 @@ const List = () => {
             <div style={{ transform: `translateY(${offsetY}px)` }}>
               <Table>
                 <Table.Header>
+                   
                   <Table.HeaderCell className="hidden sm:table-cell">
                     id
                   </Table.HeaderCell>
@@ -146,6 +147,7 @@ const List = () => {
                 <Table.Body>
                   {visibleMovies.map((movie) => (
                     <Table.Row key={movie.id}>
+                     
                       <Table.Cell className="hidden sm:table-cell ">
                         <div className="flex h-20 w-20">
                           <img
@@ -156,14 +158,12 @@ const List = () => {
                         ID: {movie.id}
                       </Table.Cell>
                       <Table.Cell className="text-lg">
-                         <img className="sm:hidden"
-                            src={movie.poster}
-                            alt={`${movie.title} poster`}
-                            
-                          />
-                          {movie.title}
-
-
+                        <img
+                          className="sm:hidden"
+                          src={movie.poster}
+                          alt={`${movie.title} poster`}
+                        />
+                        {movie.title}
                       </Table.Cell>
 
                       <Table.Cell className="hidden md:table-cell">
@@ -189,6 +189,8 @@ const List = () => {
             </div>
           </div>
         </div>
+
+                
       )}
     </div>
   );

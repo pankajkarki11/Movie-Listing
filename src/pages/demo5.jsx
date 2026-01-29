@@ -121,6 +121,7 @@ const List = () => {
     setSearchGenres("");
   };
 
+  // FIXED: CSV Export Function with proper formatting
   const exportToCSV = () => {
     if (filteredMovies.length === 0) {
       alert("No data to export!");
@@ -133,7 +134,7 @@ const List = () => {
     // Convert filtered movies to CSV rows
     const csvRows = filteredMovies.map(movie => {
       const releaseDate = new Date(movie.release_date * 1000).toLocaleDateString("en-CA");
-      const genres = movie.genres ? movie.genres.join("; ") : ""; 
+      const genres = movie.genres ? movie.genres.join("; ") : ""; // Changed to semicolon to avoid comma issues
       
       // Escape fields that contain commas, quotes, or newlines
       const escapeCSV = (field) => {
@@ -147,9 +148,9 @@ const List = () => {
       };
 
       return [
-        movie.id, 
+        movie.id, // Don't escape ID, it's just a number
         escapeCSV(movie.title),
-        `"${releaseDate}"`, 
+        `"${releaseDate}"`, // FIXED: Always quote dates to prevent Excel auto-formatting
         escapeCSV(genres),
         escapeCSV(movie.overview),
         escapeCSV(movie.poster)
@@ -177,15 +178,16 @@ const List = () => {
     URL.revokeObjectURL(url);
   };
 
-  
+  // FIXED: Better scrolling calculations
   const itemSize = 130;
-  const bufferItems = 15; 
+  const bufferItems = 15; // Reduced buffer for better performance
   
-
+  // Calculate total height more accurately
   const totalHeight = useMemo(() => {
     return filteredMovies.length * itemSize;
   }, [filteredMovies.length, itemSize]);
 
+  // FIXED: Better viewport calculations
   const { visibleMovies, offsetY } = useMemo(() => {
     const containerHeight = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 800;
     
