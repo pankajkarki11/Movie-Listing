@@ -1,23 +1,23 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Table from "./Table";
 import Input from "./Input";
 
-const MovieListing = () => {
+const List = () => {
   const [allMovies, setAllMovies] = useState([]);
+  const [filteredMovies, setFilteredMovies] = useState([]);
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredMovies, setFilteredMovies] = useState([]);
+  const [searchId, setSearchId] = useState("");
+  const [searchTitle, setSearchTitle] = useState("");
+  const [searchOverview, setSearchOverview] = useState("");
+  const [searchReleaseDate, setSearchReleaseDate] = useState("");
+  const [searchGenres, setSearchGenres] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [scrollTop, setScrollTop] = useState(0); //tracks how dar user has scrolled down(in pixels)
+  const [isVisible, setIsVisible] = useState(false);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [error, setError] = useState();
 
-  const ITEM_HEIGHT = 80; // Approximate height of each table row in pixels
-  const VISIBLE_ITEMS = 6; // Number
-  // of items visible in viewport
-  const BUFFER_ITEMS = 20; // Items to keep above and below viewport
-
-  // Fetch all movies once
   const fetchMovies = async () => {
     setLoading(true);
     try {
@@ -32,168 +32,389 @@ const MovieListing = () => {
       setLoading(false);
     }
   };
-  const allGenres = [
-    ...new Set(allMovies.flatMap((movie) => movie.genres || [])),
-  ];
 
   useEffect(() => {
     fetchMovies();
   }, []);
 
-  useEffect(() => {
-    filterMovies();
-  }, [searchTerm, selectedGenre, allMovies]);
+  const allGenres = useMemo(
+    () => [...new Set(allMovies.flatMap((movie) => movie.genres || []))],
+    [allMovies],
+  );
 
-  const filterMovies = () => {
+  const filterMovies = useCallback(() => {
     let filtered = [...allMovies];
+
+    if (searchId) {
+      filtered = filtered.filter((movie) => movie.id.toString() === searchId);
+    }
+
+    if (searchTitle) {
+      const searchLower = searchTitle.toLowerCase();
+      filtered = filtered.filter((movie) =>
+        movie.title?.toLowerCase().includes(searchLower),
+      );
+    }
+
+    if (searchOverview) {
+      const searchLower = searchOverview.toLowerCase();
+      filtered = filtered.filter((movie) =>
+        movie.overview?.toLowerCase().includes(searchLower),
+      );
+    }
+
+    if (searchReleaseDate) {
+      filtered = filtered.filter((movie) => {
+        const movieDate = new Date(movie.release_date * 1000)
+          .toLocaleDateString("en-CA");
+        return movieDate.startsWith(searchReleaseDate);
+      });
+    }
+
+    if (searchGenres) {
+      const searchLower = searchGenres.toLowerCase();
+      filtered = filtered.filter((movie) =>
+        movie.genres?.some((genre) =>
+          genre.toLowerCase().includes(searchLower),
+        ),
+      );
+    }
+
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (movie) =>
-          movie.title.toLowerCase().includes(searchLower) ||
-          movie.overview.toLowerCase().includes(searchLower) ||
-          movie.id.toString().includes(searchTerm),
+          movie.title?.toLowerCase().includes(searchLower) ||
+          movie.overview?.toLowerCase().includes(searchLower),
       );
     }
+
     if (selectedGenre !== "all") {
       filtered = filtered.filter((movie) =>
         movie.genres?.includes(selectedGenre),
       );
     }
+
     setFilteredMovies(filtered);
-  };
+  }, [
+    allMovies,
+    searchId,
+    searchTitle,
+    searchOverview,
+    searchReleaseDate,
+    searchGenres,
+    searchTerm,
+    selectedGenre,
+  ]);
 
-  const clearfilter = () => {
-    setSelectedGenre("all");
+  useEffect(() => {
+    filterMovies();
+  }, [filterMovies]);
+
+  const clearFilter = () => {
     setSearchTerm("");
+    setSelectedGenre("all");
+    setSearchId("");
+    setSearchTitle("");
+    setSearchOverview("");
+    setSearchReleaseDate("");
+    setSearchGenres("");
   };
 
-  // Handle scroll event
-  const handleScroll = (e) => {
-    setScrollTop(e.target.scrollTop);
+  // FIXED: CSV Export Function with proper formatting
+  const exportToCSV = () => {
+    if (filteredMovies.length === 0) {
+      alert("No data to export!");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = ["ID", "Title", "Release Date", "Genres", "Overview", "Poster URL"];
+    
+    // Convert filtered movies to CSV rows
+    const csvRows = filteredMovies.map(movie => {
+      const releaseDate = new Date(movie.release_date * 1000).toLocaleDateString("en-CA");
+      const genres = movie.genres ? movie.genres.join("; ") : ""; // Changed to semicolon to avoid comma issues
+      
+      // Escape fields that contain commas, quotes, or newlines
+      const escapeCSV = (field) => {
+        if (field === null || field === undefined) return "";
+        const stringField = String(field);
+        // Always wrap fields with commas, quotes, or newlines in quotes
+        if (stringField.includes(",") || stringField.includes('"') || stringField.includes("\n")) {
+          return `"${stringField.replace(/"/g, '""')}"`;
+        }
+        return stringField;
+      };
+
+      return [
+        movie.id, // Don't escape ID, it's just a number
+        escapeCSV(movie.title),
+        `"${releaseDate}"`, // FIXED: Always quote dates to prevent Excel auto-formatting
+        escapeCSV(genres),
+        escapeCSV(movie.overview),
+        escapeCSV(movie.poster)
+      ].join(",");
+    });
+
+    // Combine headers and rows
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+
+    // Create blob and download with BOM for proper Excel encoding
+    const BOM = "\uFEFF"; // FIXED: Add BOM for proper UTF-8 encoding in Excel
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", `movies_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = "hidden";
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
   };
 
-  // Calculate which items to render
-  const totalHeight = filteredMovies.length * ITEM_HEIGHT;
-  const startIndex = Math.max(
-    0,
-    Math.floor(scrollTop / ITEM_HEIGHT) - BUFFER_ITEMS,
-  );
-  const endIndex = Math.min(
-    filteredMovies.length,
-    Math.ceil((scrollTop + VISIBLE_ITEMS * ITEM_HEIGHT) / ITEM_HEIGHT) +
-      BUFFER_ITEMS,
-  );
+  // FIXED: Better scrolling calculations
+  const itemSize = 130;
+  const bufferItems = 15; // Reduced buffer for better performance
+  
+  // Calculate total height more accurately
+  const totalHeight = useMemo(() => {
+    return filteredMovies.length * itemSize;
+  }, [filteredMovies.length, itemSize]);
 
-  const visibleMovies = filteredMovies.slice(startIndex, endIndex);
-  const offsetY = startIndex * ITEM_HEIGHT;
+  // FIXED: Better viewport calculations
+  const { visibleMovies, offsetY } = useMemo(() => {
+    const containerHeight = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 800;
+    
+    const startIndex = Math.max(
+      0,
+      Math.floor(scrollTop / itemSize) - bufferItems,
+    );
+    
+    const visibleCount = Math.ceil(containerHeight / itemSize);
+    const endIndex = Math.min(
+      filteredMovies.length,
+      startIndex + visibleCount + (bufferItems * 2)
+    );
+    
+    return {
+      visibleMovies: filteredMovies.slice(startIndex, endIndex),
+      offsetY: startIndex * itemSize
+    };
+  }, [filteredMovies, scrollTop, itemSize, bufferItems]);
+
+  // FIXED: Throttled scroll handler
+  const scrollabe = useCallback((e) => {
+    const newScrollTop = e.target.scrollTop;
+    requestAnimationFrame(() => {
+      setScrollTop(newScrollTop);
+    });
+  }, []);
 
   return (
-    <div>
-      <div className="flex text-3xl justify-center mb-4">Movie Listing</div>
-      <div className="flex items-center justify-center">
-        <form type="submit" className="flex items-center justify-center ">
-          <Input
-            label=" Search"
-            onChange={(e) => setSearchTerm(e.target.value)}
-            value={searchTerm}
-            className="text-gray-800"
-            type="text"
-          />
+    <div className="flex-col justify-center items-center bg-gray-100 min-h-screen">
+      <div className="flex text-3xl justify-center mb-4 pt-4">Movie Listing</div>
 
-          <select
-            label="Genre"
-            className="w-70 ml-4 px-4 py-2.5 border border-gray-300 rounded-lg bg-white dtext-gray-900  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            value={selectedGenre}
-            onChange={(e) => setSelectedGenre(e.target.value)}
-          >
-            <option value="all">All Genres</option>
-            {allGenres.map((genre, idx) => (
-              <option
-                key={idx}
-                value={genre}
-                className="inline-block  px-2 py-1 rounded-lg mr-1 mb-1 text-xs"
-              >
-                {genre}
-              </option>
-            ))}
-          </select>
-        </form>
+      <div className="flex items-center justify-center flex-wrap gap-4 mb-4 px-4">
+        <Input
+          className="w-80 h-10 border-2 border-blue-500 rounded-lg px-4"
+          label="Search"
+          type="text"
+          placeholder="Search by title or overview"
+          onChange={(e) => setSearchTerm(e.target.value)}
+          value={searchTerm}
+          aria-label="Search movies"
+        />
+
+        <select
+          className="w-60 h-10 border-2 border-gray-500 rounded-lg px-4"
+          value={selectedGenre}
+          onChange={(e) => setSelectedGenre(e.target.value)}
+          aria-label="Filter by genre"
+        >
+          <option value="all">All Genres</option>
+          {allGenres.map((genre, idx) => (
+            <option key={idx} value={genre}>
+              {genre}
+            </option>
+          ))}
+        </select>
+
         <button
-          className="bg-blue-400 text-white px-4 py-2 rounded-lg ml-4 hover:bg-blue-600"
-          onClick={clearfilter}
+          className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-400 transition-colors"
+          onClick={clearFilter}
         >
           Clear Filter
         </button>
+        
+        <button
+          className="px-4 py-2 bg-blue-200 rounded-lg hover:bg-blue-400 transition-colors"
+          onClick={() => setIsVisible(!isVisible)}
+        >
+          {isVisible ? "Hide" : "Show"} Column Search
+        </button>
+
+        <button
+          className="px-4 py-2 bg-green-200 rounded-lg hover:bg-green-400 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+          onClick={exportToCSV}
+          disabled={filteredMovies.length === 0}
+        >
+          📥 Export to CSV ({filteredMovies.length})
+        </button>
       </div>
+      
+      <p className="flex items-center justify-center mb-4 text-gray-600">
+        Showing {filteredMovies.length} out of {allMovies.length} movies
+      </p>
+      
       {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin text-blue-500 text-4xl">⟳</div>
+        <div className="flex justify-center items-center h-[80vh]">
+          <p className="text-xl">Loading...</p>
         </div>
       ) : error ? (
-        <div className="text-red-500 text-center">Error: {error.message}</div>
+        <div className="flex justify-center items-center h-[80vh]">
+          <p className="text-xl text-red-500">{error.message}</p>
+        </div>
       ) : (
         <div
-          onScroll={handleScroll}
-          className="overflow-auto"
-          style={{ height: "600px" }} // Fixed height for scrollable container
+          className="overflow-auto h-[80vh]"
+          onScroll={scrollabe}
+          style={{ 
+            overscrollBehavior: 'contain'
+          }}
         >
-          <div style={{ height: `${totalHeight}px`, position: "relative" }}>
-            <div style={{ transform: `translateY(${offsetY}px)` }}>
+         
+          <div style={{ 
+            height: `${totalHeight}px`, 
+            position: "relative",
+            minHeight: '100%' 
+          }}>
+            <div 
+              style={{ 
+                transform: `translateY(${offsetY}px)`,
+                willChange: "transform"
+              }}
+            >
               <Table>
                 <Table.Header>
-                  <Table.HeaderCell>Movie ID</Table.HeaderCell>
-                  <Table.HeaderCell>Movie Title</Table.HeaderCell>
-                  <Table.HeaderCell>Release Date</Table.HeaderCell>
-                  <Table.HeaderCell>Genre</Table.HeaderCell>
+                  <Table.HeaderCell className="hidden sm:table-cell">
+                    Index
+                  </Table.HeaderCell>
+                  <Table.HeaderCell className="hidden sm:table-cell">
+                    ID
+                  </Table.HeaderCell>
+                  <Table.HeaderCell>Title</Table.HeaderCell>
+                  <Table.HeaderCell className="hidden md:table-cell">
+                    Release Date
+                  </Table.HeaderCell>
+                  <Table.HeaderCell className="hidden lg:table-cell">
+                    Genre
+                  </Table.HeaderCell>
                   <Table.HeaderCell>Overview</Table.HeaderCell>
                 </Table.Header>
+
                 <Table.Body>
-                  {visibleMovies.map((movie, index) => {
-                    const actualIndex = startIndex + index;
+                  {isVisible && (
+                    <Table.Row>
+                      <Table.Cell className="hidden sm:table-cell"></Table.Cell>
+                      <Table.Cell className="hidden sm:table-cell">
+                        <Input
+                          placeholder="Id..."
+                          label="Search By ID"
+                          type="number"
+                          onChange={(e) => setSearchId(e.target.value)}
+                          value={searchId}
+                        />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Input
+                          placeholder="Search Title..."
+                          type="text"
+                          label="Search By Title"
+                          onChange={(e) => setSearchTitle(e.target.value)}
+                          value={searchTitle}
+                        />
+                      </Table.Cell>
+                      <Table.Cell className="hidden md:table-cell">
+                        <Input
+                          placeholder="Date..."
+                          label="YYYY-MM"
+                          type="text"
+                          onChange={(e) => setSearchReleaseDate(e.target.value)}
+                          value={searchReleaseDate}
+                        />
+                      </Table.Cell>
+                      <Table.Cell className="hidden lg:table-cell">
+                        <Input
+                          placeholder="Action..."
+                          type="text"
+                          label="Search By Genre"
+                          onChange={(e) => setSearchGenres(e.target.value)}
+                          value={searchGenres}
+                        />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Input
+                          placeholder="Search Overview"
+                          type="text"
+                          label="Search By Overview"
+                          onChange={(e) => setSearchOverview(e.target.value)}
+                          value={searchOverview}
+                        />
+                      </Table.Cell>
+                    </Table.Row>
+                  )}
+                  {visibleMovies.map((movie) => {
+                    const index = filteredMovies.findIndex((m) => m.id === movie.id);
                     return (
                       <Table.Row key={movie.id}>
-                        <Table.Cell>
-                          <div className="flex items-center">
-                            <img
-                              className="h-10 w-10 rounded-lg object-cover mr-3"
-                              src={movie.poster}
-                              alt={movie.title}
-                              loading="lazy"
-                              onError={(e) => {
-                                e.target.src =
-                                  "https://via.placeholder.com/150?text=No+Image";
-                              }}
-                            />
-                            <div>
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                ID: {movie.id}
-                              </div>
-                            </div>
-                          </div>
+                        <Table.Cell className="hidden sm:table-cell">
+                          {index + 1}
                         </Table.Cell>
-                        <Table.Cell>{movie.title}</Table.Cell>
-                        <Table.Cell>
-                          {" "}
+
+                        <Table.Cell className="hidden sm:table-cell">
+                          <div className="flex h-20 w-20">
+                            <img
+                              src={movie.poster}
+                              alt={`${movie.title} poster`}
+                              loading="lazy"
+                            />
+                          </div>
+                          ID: {movie.id}
+                        </Table.Cell>
+                        <Table.Cell className="text-lg">
+                          <img
+                            className="sm:hidden h-20 w-20"
+                            src={movie.poster}
+                            alt={`${movie.title} poster`}
+                            loading="lazy"
+                          />
+                          {movie.title}
+                        </Table.Cell>
+
+                        <Table.Cell className="hidden md:table-cell">
                           {new Date(
                             movie.release_date * 1000,
-                          ).toLocaleDateString()}
+                          ).toLocaleDateString("en-CA")}
                         </Table.Cell>
-                        <Table.Cell>
-                          {movie.genres?.map((genre, idx) => (
-                            <div
-                              key={idx}
-                              className="inline-block bg-gray-200 text-gray-800 px-2 py-1 rounded mr-1 mb-1 text-xs"
-                            >
-                              {genre}
-                            </div>
-                          ))}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <div className="max-h-20 overflow-hidden text-sm">
-                            {movie.overview}
+                        <Table.Cell className="hidden lg:table-cell">
+                          <div className="flex flex-wrap gap-1">
+                            {movie.genres.map((genre, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-gray-200 text-gray-800 px-2 py-1 rounded-sm text-xs"
+                              >
+                                {genre}
+                              </div>
+                            ))}
                           </div>
                         </Table.Cell>
+                        <Table.Cell>{movie.overview}</Table.Cell>
                       </Table.Row>
                     );
                   })}
@@ -203,16 +424,8 @@ const MovieListing = () => {
           </div>
         </div>
       )}
-
-      <div className="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg text-sm">
-        <div>Total: {filteredMovies.length} movies</div>
-        <div>Rendering: {visibleMovies.length} items</div>
-        <div>
-          Range: {startIndex + 1} - {endIndex}
-        </div>
-      </div>
     </div>
   );
 };
 
-export default MovieListing;
+export default List;

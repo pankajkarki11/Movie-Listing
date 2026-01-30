@@ -1,5 +1,5 @@
 import { useState, useEffect, use } from "react";
-import Table from "./Table";
+import Table from "../Table";
 
 const MovieListing = () => {
   const [currentMovies, setCurrentMovies] = useState([]);
@@ -25,13 +25,11 @@ const MovieListing = () => {
     fetchMovies();
   }, []);
 
-//  const moviesPerPage = 30;
+  //  const moviesPerPage = 30;
 
-
-
-// const startIndex = (page - 1) * moviesPerPage;
-// const endIndex = page * moviesPerPage;
-// const currentMovies = movies.slice(startIndex, endIndex);
+  // const startIndex = (page - 1) * moviesPerPage;
+  // const endIndex = page * moviesPerPage;
+  // const currentMovies = movies.slice(startIndex, endIndex);
 
   return (
     <div>
@@ -69,8 +67,12 @@ const MovieListing = () => {
                     </div>
                   </div>
                 </Table.Cell>
-                <Table.Cell className="text-md">{currentMovies.title}</Table.Cell>
-                <Table.Cell className="text-sm">{currentMovies.release_date}</Table.Cell>
+                <Table.Cell className="text-md">
+                  {currentMovies.title}
+                </Table.Cell>
+                <Table.Cell className="text-sm">
+                  {currentMovies.release_date}
+                </Table.Cell>
                 <Table.Cell className="text-sm">
                   {currentMovies.genres.map((genre, index) => (
                     <div
@@ -91,11 +93,9 @@ const MovieListing = () => {
             ))}
           </Table.Body>
         </Table>
-
-       
       )}
 
-       {/* <div className="flex justify-center mt-4">
+      {/* <div className="flex justify-center mt-4">
        {page > 1 &&   <button
             className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-l"
             onClick={() =>{ setPage(page - 1)

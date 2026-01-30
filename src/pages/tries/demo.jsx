@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import Table from "./Table";
-import Input from "./Input";
+import Table from "../Table";
+import Input from "../Input";
 
 const List = () => {
   const [allMovies, setAllMovies] = useState([]);
@@ -30,9 +30,10 @@ const List = () => {
     fetchMovies();
   }, []);
 
-  const allGenres = useMemo(() => [
-    ...new Set(allMovies.flatMap((movie) => movie.genres || [])),
-  ], [allMovies]);
+  const allGenres = useMemo(
+    () => [...new Set(allMovies.flatMap((movie) => movie.genres || []))],
+    [allMovies],
+  );
 
   const filterMovies = () => {
     let filtered = [...allMovies];
@@ -121,76 +122,74 @@ const List = () => {
       </div>
       {loading ? (
         <p>loading...</p>
-      ) : ((error && <p>{error.message}</p>) || 
-        <div
-          className="overflow-auto h-[90vh] md:h-[90vh] lg:h-[80vh]"
-          onScroll={scrollabe}
-        >
-          <div style={{ height: `${totalHeight}px`, position: "relative" }}>
-            <div style={{ transform: `translateY(${offsetY}px)` }}>
-              <Table>
-                <Table.Header>
-                   
-                  <Table.HeaderCell className="hidden sm:table-cell">
-                    id
-                  </Table.HeaderCell>
-                  <Table.HeaderCell>title</Table.HeaderCell>
-                  <Table.HeaderCell className="hidden md:table-cell">
-                    release_date
-                  </Table.HeaderCell>
-                  <Table.HeaderCell className="hidden lg:table-cell">
-                    Genre
-                  </Table.HeaderCell>
-                  <Table.HeaderCell>Overview</Table.HeaderCell>
-                </Table.Header>
+      ) : (
+        (error && <p>{error.message}</p>) || (
+          <div
+            className="overflow-auto h-[90vh] md:h-[90vh] lg:h-[80vh]"
+            onScroll={scrollabe}
+          >
+            <div style={{ height: `${totalHeight}px`, position: "relative" }}>
+              <div style={{ transform: `translateY(${offsetY}px)` }}>
+                <Table>
+                  <Table.Header>
+                    <Table.HeaderCell className="hidden sm:table-cell">
+                      id
+                    </Table.HeaderCell>
+                    <Table.HeaderCell>title</Table.HeaderCell>
+                    <Table.HeaderCell className="hidden md:table-cell">
+                      release_date
+                    </Table.HeaderCell>
+                    <Table.HeaderCell className="hidden lg:table-cell">
+                      Genre
+                    </Table.HeaderCell>
+                    <Table.HeaderCell>Overview</Table.HeaderCell>
+                  </Table.Header>
 
-                <Table.Body>
-                  {visibleMovies.map((movie) => (
-                    <Table.Row key={movie.id}>
-                     
-                      <Table.Cell className="hidden sm:table-cell ">
-                        <div className="flex h-20 w-20">
+                  <Table.Body>
+                    {visibleMovies.map((movie) => (
+                      <Table.Row key={movie.id}>
+                        <Table.Cell className="hidden sm:table-cell ">
+                          <div className="flex h-20 w-20">
+                            <img
+                              src={movie.poster}
+                              alt={`${movie.title} poster`}
+                            />
+                          </div>
+                          ID: {movie.id}
+                        </Table.Cell>
+                        <Table.Cell className="text-lg">
                           <img
+                            className="sm:hidden"
                             src={movie.poster}
                             alt={`${movie.title} poster`}
                           />
-                        </div>
-                        ID: {movie.id}
-                      </Table.Cell>
-                      <Table.Cell className="text-lg">
-                        <img
-                          className="sm:hidden"
-                          src={movie.poster}
-                          alt={`${movie.title} poster`}
-                        />
-                        {movie.title}
-                      </Table.Cell>
+                          {movie.title}
+                        </Table.Cell>
 
-                      <Table.Cell className="hidden md:table-cell">
-                        {new Date(movie.release_date * 1000).toLocaleDateString(
-                          "en-CA",
-                        )}
-                      </Table.Cell>
-                      <Table.Cell className="hidden lg:table-cell">
-                        {movie.genres.map((genre, index) => (
-                          <div
-                            key={index}
-                            className="bg-gray-200 text-gray-800 px-2 py-1 rounded-sm mr-1 mb-2 text-xs"
-                          >
-                            {genre}
-                          </div>
-                        ))}
-                      </Table.Cell>
-                      <Table.Cell>{movie.overview}</Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table>
+                        <Table.Cell className="hidden md:table-cell">
+                          {new Date(
+                            movie.release_date * 1000,
+                          ).toLocaleDateString("en-CA")}
+                        </Table.Cell>
+                        <Table.Cell className="hidden lg:table-cell">
+                          {movie.genres.map((genre, index) => (
+                            <div
+                              key={index}
+                              className="bg-gray-200 text-gray-800 px-2 py-1 rounded-sm mr-1 mb-2 text-xs"
+                            >
+                              {genre}
+                            </div>
+                          ))}
+                        </Table.Cell>
+                        <Table.Cell>{movie.overview}</Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table>
+              </div>
             </div>
           </div>
-        </div>
-
-                
+        )
       )}
     </div>
   );
