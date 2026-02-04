@@ -5,8 +5,9 @@ import { Route, Routes } from "react-router-dom";
 // import MovieListing from './pages/demo2'
 // import List from './pages/demo3'
 import List from "./pages/Listing";
-import Listed from "./pages/demoooos";
-import ListingPro from "./pages/ListingPro";
+// import Listed from "./pages/demoooos";
+// import ListingPro from "./pages/ListingPro";
+// import Demo from "./pages/demoooooois";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<List />} />
         {/* <Route path="/" element={<Listed />} /> */}
         {/* <Route path="/" element={<ListingPro/>}/> */}
+         {/* <Route path="/" element={<Demo />} /> */}
       </Routes>
     </>
   );
