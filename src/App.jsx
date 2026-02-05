@@ -4,10 +4,12 @@ import { Route, Routes } from "react-router-dom";
 // import List from './pages/demo'
 // import MovieListing from './pages/demo2'
 // import List from './pages/demo3'
-import List from "./pages/Listing";
-import Listed from "./pages/tries/demoooos";
-// import ListingPro from "./pages/ListingPro";
+// import List from "./pages/Listing";
+// import Listed from "./pages/tries/demoooos";
+// import ListingPro from "./pages/tries/ListingPro";
 // import Demo from "./pages/demoooooois";
+// import List from "./pages/SearchingDemo";
+import List from "./pages/searchingdemo2";
 
 function App() {
   return (

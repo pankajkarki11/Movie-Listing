@@ -1,3 +1,5 @@
+
+
 const Table = ({
    children,
     className = "",
@@ -34,6 +36,7 @@ Table.HeaderCell = ({ children, className = "", width, ...props }) => (
     {...props}
   >
     {children}
+   
   </th>
 );
 
