@@ -121,17 +121,17 @@ const List = () => {
     setSearchGenres("");
   };
 
-  // FIXED: CSV Export Function with proper formatting
+
   const exportToCSV = () => {
     if (filteredMovies.length === 0) {
       alert("No data to export!");
       return;
     }
 
-    // Define CSV headers
+
     const headers = ["ID", "Title", "Release Date", "Genres", "Overview", "Poster URL"];
     
-    // Convert filtered movies to CSV rows
+   
     const csvRows = filteredMovies.map(movie => {
       const releaseDate = new Date(movie.release_date * 1000).toLocaleDateString("en-CA");
       const genres = movie.genres ? movie.genres.join("; ") : ""; // Changed to semicolon to avoid comma issues
@@ -150,7 +150,7 @@ const List = () => {
       return [
         movie.id, // Don't escape ID, it's just a number
         escapeCSV(movie.title),
-        `"${releaseDate}"`, // FIXED: Always quote dates to prevent Excel auto-formatting
+        `"${releaseDate}"`, 
         escapeCSV(genres),
         escapeCSV(movie.overview),
         escapeCSV(movie.poster)
@@ -161,7 +161,7 @@ const List = () => {
     const csvContent = [headers.join(","), ...csvRows].join("\n");
 
     // Create blob and download with BOM for proper Excel encoding
-    const BOM = "\uFEFF"; // FIXED: Add BOM for proper UTF-8 encoding in Excel
+    const BOM = "\uFEFF"; //  Add BOM for proper UTF-8 encoding in Excel
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -178,16 +178,16 @@ const List = () => {
     URL.revokeObjectURL(url);
   };
 
-  // FIXED: Better scrolling calculations
+ 
   const itemSize = 130;
-  const bufferItems = 15; // Reduced buffer for better performance
+  const bufferItems = 15; 
   
   // Calculate total height more accurately
   const totalHeight = useMemo(() => {
     return filteredMovies.length * itemSize;
   }, [filteredMovies.length, itemSize]);
 
-  // FIXED: Better viewport calculations
+  // Better viewport calculations
   const { visibleMovies, offsetY } = useMemo(() => {
     const containerHeight = typeof window !== 'undefined' ? window.innerHeight * 0.8 : 800;
     
@@ -208,7 +208,7 @@ const List = () => {
     };
   }, [filteredMovies, scrollTop, itemSize, bufferItems]);
 
-  // FIXED: Throttled scroll handler
+  // Throttled scroll handler
   const scrollabe = useCallback((e) => {
     const newScrollTop = e.target.scrollTop;
     requestAnimationFrame(() => {
