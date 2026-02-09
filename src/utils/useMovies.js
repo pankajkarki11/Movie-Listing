@@ -34,6 +34,8 @@ const useMovieFilters = (movies) => {
   );
 
 
+  
+
   const filteredMovies = useMemo(() => {
     return movies.filter((movie) => {
       
@@ -97,6 +99,85 @@ const useMovieFilters = (movies) => {
       return true;
     });
   }, [movies, filters]);
+   const exportToCSV = useCallback(() => {
+    if (filteredMovies.length === 0) {
+      alert("No data to export!");
+      return;
+    }
+
+    const headers = [
+      "ID",
+      "Title",
+      "Release Date",
+      "Genres",
+      "Overview",
+      "Poster URL",
+    ];
+
+    const escapeCSV = (field) => {
+      if (field === null || field === undefined) return "";
+      const stringField = String(field);
+
+      if (
+        stringField.includes(",") ||
+        stringField.includes('"') ||
+        stringField.includes("\n") ||
+        stringField.includes("\r")
+      ) {
+        return `"${stringField.replace(/"/g, '""')}"`;
+      }
+      return stringField;
+    };
+
+    const csvRows = filteredMovies.map((movie) => {
+      let releaseDate = "";
+      if (movie.release_date) {
+        try {
+          releaseDate = new Date(movie.release_date * 1000).toLocaleDateString("en-CA");
+        } catch (e) {
+          releaseDate = "Invalid Date";
+        }
+      }
+
+      const genres = movie.genres ? movie.genres.join("; ") : "";
+
+      return [
+        movie.id || "",
+        escapeCSV(movie.title),
+        escapeCSV(releaseDate),
+        escapeCSV(genres),
+        escapeCSV(movie.overview),
+        escapeCSV(movie.poster),
+      ].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+
+    // BOM for proper UTF-8 encoding in Excel
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `movies_export_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+
+    document.body.appendChild(link);
+    link.click();
+
+  
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }, [filteredMovies]);
+
 
   return {
     filters,
@@ -104,6 +185,7 @@ const useMovieFilters = (movies) => {
     clearFilters,
     filteredMovies,
     allGenres,
+    exportToCSV,
   };
 };
 

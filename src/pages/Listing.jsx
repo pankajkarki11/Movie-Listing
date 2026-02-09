@@ -11,7 +11,7 @@ const List = () => {
   const [error, setError] = useState(null);
 
  
-  const { filters, updateFilter, clearFilters, filteredMovies, allGenres } =
+  const { filters, updateFilter, clearFilters, filteredMovies, allGenres,exportToCSV } =
     useMovieFilters(allMovies);
 
   const fetchMovies = useCallback(async () => {
@@ -27,16 +27,10 @@ const List = () => {
       }
 
       const data = await response.json();
-
-      // Validate data structure
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid data format: expected an array");
-      }
-
       setAllMovies(data);
     } catch (error) {
       setError(error);
-      console.error("Failed to fetch movies:", error);
+      
     } finally {
       setLoading(false);
     }
@@ -45,86 +39,6 @@ const List = () => {
   useEffect(() => {
     fetchMovies();
   }, [fetchMovies]);
-
-  const exportToCSV = useCallback(() => {
-    if (filteredMovies.length === 0) {
-      alert("No data to export!");
-      return;
-    }
-
-    const headers = [
-      "ID",
-      "Title",
-      "Release Date",
-      "Genres",
-      "Overview",
-      "Poster URL",
-    ];
-
-    // Helper to escape CSV fields
-    const escapeCSV = (field) => {
-      if (field === null || field === undefined) return "";
-      const stringField = String(field);
-
-      if (
-        stringField.includes(",") ||
-        stringField.includes('"') ||
-        stringField.includes("\n") ||
-        stringField.includes("\r")
-      ) {
-        return `"${stringField.replace(/"/g, '""')}"`;
-      }
-      return stringField;
-    };
-
-    const csvRows = filteredMovies.map((movie) => {
-      let releaseDate = "";
-      if (movie.release_date) {
-        try {
-          releaseDate = new Date(movie.release_date * 1000).toLocaleDateString("en-CA");
-        } catch (e) {
-          releaseDate = "Invalid Date";
-        }
-      }
-
-      const genres = movie.genres ? movie.genres.join("; ") : "";
-
-      return [
-        movie.id || "",
-        escapeCSV(movie.title),
-        escapeCSV(releaseDate),
-        escapeCSV(genres),
-        escapeCSV(movie.overview),
-        escapeCSV(movie.poster),
-      ].join(",");
-    });
-
-    const csvContent = [headers.join(","), ...csvRows].join("\n");
-
-    // BOM for proper UTF-8 encoding in Excel
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `movies_export_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    link.style.visibility = "hidden";
-
-    document.body.appendChild(link);
-    link.click();
-
-  
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 100);
-  }, [filteredMovies]);
 
   // Virtual scrolling configuration
   const itemSize = 130;
@@ -163,7 +77,7 @@ const List = () => {
     <div className="flex-col justify-center items-center bg-gray-100 min-h-screen">
       <div className="flex text-3xl justify-center mb-4 pt-4">Movie Listing</div>
 
-      <section className="mb-3 grid gap-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+      <section className="mb-3 grid gap-2 rounded-2xl border border-slate-800 bg-slate-800/60 p-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
      
         <Input
           label="Search"
@@ -203,7 +117,7 @@ const List = () => {
           label="Release Date"
           type="text"
           placeholder="YYYY-MM-DD"
-          helperText="Format: YYYY-MM-DD or YYYY-MM or YYYY"
+         
           value={filters.searchReleaseDate}
           onChange={(e) => updateFilter("searchReleaseDate", e.target.value)}
         />
@@ -353,9 +267,10 @@ const List = () => {
                         </Table.Cell>
 
                         <Table.Cell className="hidden sm:table-cell">
-                          <div className="flex h-20 w-20">
+                          <div className="flex h-15 w-20">
                             {movie.poster ? (
                               <img
+                                className="h-16 w-12 rounded-lg object-cover shadow-lg"
                                 src={movie.poster}
                                 alt={`${movie.title || 'Movie'} poster`}
                                 loading="lazy"
