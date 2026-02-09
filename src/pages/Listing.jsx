@@ -201,6 +201,7 @@ const List = () => {
               onClick={fetchMovies}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
             >
+              
               Try Again
             </button>
           </div>
@@ -314,7 +315,7 @@ const List = () => {
                               movie.genres.map((genre) => (
                                 <div
                                   key={genre}
-                                  className="bg-slate-300 text-gray-800 px-2 py-1 rounded-full text-xs"
+                                  className="bg-slate-200 text-gray-800 px-2 py-1 rounded-full text-xs border border-slate-300"
                                 >
                                   {genre}
                                 </div>
