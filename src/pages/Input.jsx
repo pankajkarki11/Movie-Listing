@@ -28,7 +28,7 @@ const Input = ({
 
         <input
           className={`
-            h-11 flex-1 rounded-xl border border-slate-700 bg-slate-950/60 px-4 text-sm text-slate-100 outline-none ring-emerald-500/60 transition focus:ring-2
+            h-8 flex-1 rounded-xl border border-slate-700 bg-slate-950/60 px-4 text-sm text-slate-100 outline-none ring-emerald-500/60 transition focus:ring-2
             ${leftIcon ? 'pl-10' : ''}
             ${rightIcon ? 'pr-10' : ''}
             ${error ? 'border-red-500 ring-red-500/60' : ''}

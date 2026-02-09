@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Table from "./Table";
-import Input from "./Input";
+import Table from "../Table";
+import Input from "../Input";
 
 const List = () => {
   const [allMovies, setAllMovies] = useState([]);
