@@ -102,7 +102,7 @@ const useMovieFilters = (movies) => {
 
 
   
-   const exportToCSV =(() => {
+   const exportToCSV =useCallback(() => {
     if (filteredMovies.length === 0) {
       alert("No data to export!");
       return;

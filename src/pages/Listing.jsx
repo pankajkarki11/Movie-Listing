@@ -10,16 +10,21 @@ const List = () => {
   const [scrollTop, setScrollTop] = useState(0);
   const [error, setError] = useState(null);
 
- 
-  const { filters, updateFilter, clearFilters, filteredMovies, allGenres,exportToCSV } =
-    useMovieFilters(allMovies);
+  const {
+    filters,
+    updateFilter,
+    clearFilters,
+    filteredMovies,
+    allGenres,
+    exportToCSV,
+  } = useMovieFilters(allMovies);
 
   const fetchMovies = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(
-        "https://raw.githubusercontent.com/Allyedge/movies/refs/heads/main/data/movies.json"
+        "https://raw.githubusercontent.com/Allyedge/movies/refs/heads/main/data/movies.json",
       );
 
       if (!response.ok) {
@@ -30,7 +35,6 @@ const List = () => {
       setAllMovies(data);
     } catch (error) {
       setError(error);
-      
     } finally {
       setLoading(false);
     }
@@ -45,18 +49,21 @@ const List = () => {
   const bufferItems = 15;
 
   const totalHeight = useMemo(() => {
-    return Math.max(filteredMovies.length * itemSize, 100); 
+    return Math.max(filteredMovies.length * itemSize, 100);
   }, [filteredMovies.length]);
 
   const { visibleMovies, offsetY, startIndex } = useMemo(() => {
     const containerHeight =
       typeof window !== "undefined" ? window.innerHeight * 0.8 : 800;
 
-    const startIdx = Math.max(0, Math.floor(scrollTop / itemSize) - bufferItems);
+    const startIdx = Math.max(
+      0,
+      Math.floor(scrollTop / itemSize) - bufferItems,
+    );
     const visibleCount = Math.ceil(containerHeight / itemSize);
     const endIndex = Math.min(
       filteredMovies.length,
-      startIdx + visibleCount + bufferItems * 2
+      startIdx + visibleCount + bufferItems * 2,
     );
 
     return {
@@ -75,10 +82,11 @@ const List = () => {
 
   return (
     <div className="flex-col justify-center items-center bg-gray-100 min-h-screen">
-      <div className="flex text-3xl justify-center mb-4 pt-4">Movie Listing</div>
+      <div className="flex text-3xl justify-center mb-4 pt-4">
+        Movie Listing
+      </div>
 
       <section className="mb-3 grid gap-2 rounded-2xl border border-slate-800 bg-slate-800/60 p-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
-     
         <Input
           label="Search"
           type="text"
@@ -117,7 +125,6 @@ const List = () => {
           label="Release Date"
           type="text"
           placeholder="YYYY-MM-DD"
-         
           value={filters.searchReleaseDate}
           onChange={(e) => updateFilter("searchReleaseDate", e.target.value)}
         />
@@ -144,7 +151,7 @@ const List = () => {
               <Input
                 label="Search By Overview"
                 type="text"
-                placeholder="Search overview..." 
+                placeholder="Search overview..."
                 value={filters.searchOverview}
                 onChange={(e) => updateFilter("searchOverview", e.target.value)}
               />
@@ -173,7 +180,9 @@ const List = () => {
               type="button"
               className="rounded-xl border border-emerald-900 px-2 py-2 text-sm text-slate-200 transition hover:border-emerald-500"
               onClick={() => setIsVisible(!isVisible)}
-              aria-label={isVisible ? "Hide advanced search" : "Show advanced search"}
+              aria-label={
+                isVisible ? "Hide advanced search" : "Show advanced search"
+              }
             >
               {isVisible ? "Hide" : "Show"} Advanced Search
             </button>
@@ -195,13 +204,14 @@ const List = () => {
       ) : error ? (
         <div className="flex justify-center items-center h-[80vh]">
           <div className="flex flex-col items-center gap-4 max-w-md p-6 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-xl text-red-600 font-semibold">Error Loading Movies</p>
+            <p className="text-xl text-red-600 font-semibold">
+              Error Loading Movies
+            </p>
             <p className="text-sm text-red-500">{error.message}</p>
             <button
               onClick={fetchMovies}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
             >
-              
               Try Again
             </button>
           </div>
@@ -209,7 +219,9 @@ const List = () => {
       ) : filteredMovies.length === 0 ? (
         <div className="flex justify-center items-center h-[80vh]">
           <div className="flex flex-col items-center gap-4">
-            <p className="text-xl text-slate-600">No movies found matching your filters</p>
+            <p className="text-xl text-slate-600">
+              No movies found matching your filters
+            </p>
             <button
               onClick={clearFilters}
               className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition"
@@ -260,7 +272,7 @@ const List = () => {
                 <Table.Body>
                   {visibleMovies.map((movie, idx) => {
                     const actualIndex = startIndex + idx;
-                    
+
                     return (
                       <Table.Row key={movie.id}>
                         <Table.Cell className="hidden sm:table-cell">
@@ -273,10 +285,11 @@ const List = () => {
                               <img
                                 className="h-16 w-12 rounded-lg object-cover shadow-lg"
                                 src={movie.poster}
-                                alt={`${movie.title || 'Movie'} poster`}
+                                alt={`${movie.title || "Movie"} poster`}
                                 loading="lazy"
                                 onError={(e) => {
-                                  e.target.src = 'https://via.placeholder.com/80x120?text=No+Image';
+                                  e.target.src =
+                                    "https://via.placeholder.com/80x120?text=No+Image";
                                 }}
                               />
                             ) : (
@@ -293,10 +306,11 @@ const List = () => {
                             <img
                               className="sm:hidden h-20 w-20"
                               src={movie.poster}
-                              alt={`${movie.title || 'Movie'} poster`}
+                              alt={`${movie.title || "Movie"} poster`}
                               loading="lazy"
                               onError={(e) => {
-                                e.target.src = 'https://via.placeholder.com/80x120?text=No+Image';
+                                e.target.src =
+                                  "https://via.placeholder.com/80x120?text=No+Image";
                               }}
                             />
                           )}
@@ -305,7 +319,9 @@ const List = () => {
 
                         <Table.Cell className="hidden md:table-cell">
                           {movie.release_date
-                            ? new Date(movie.release_date * 1000).toLocaleDateString("en-CA")
+                            ? new Date(
+                                movie.release_date * 1000,
+                              ).toLocaleDateString("en-CA")
                             : "N/A"}
                         </Table.Cell>
 
@@ -321,12 +337,16 @@ const List = () => {
                                 </div>
                               ))
                             ) : (
-                              <span className="text-slate-400 text-xs">No genres</span>
+                              <span className="text-slate-400 text-xs">
+                                No genres
+                              </span>
                             )}
                           </div>
                         </Table.Cell>
 
-                        <Table.Cell>{movie.overview || "No overview available"}</Table.Cell>
+                        <Table.Cell>
+                          {movie.overview || "No overview available"}
+                        </Table.Cell>
                       </Table.Row>
                     );
                   })}
