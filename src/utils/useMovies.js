@@ -69,8 +69,7 @@ const useMovieFilters = (movies) => {
           return false; 
         }
       }
-
-    
+      
       if (filters.searchGenres) {
         const hasMatchingGenre = movie.genres?.some((genre) =>
           genre.toLowerCase().includes(filters.searchGenres.toLowerCase())

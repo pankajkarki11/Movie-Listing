@@ -82,11 +82,9 @@ const List = () => {
 
   return (
     <div className="flex-col justify-center items-center bg-gray-100 min-h-screen">
-      <div className="flex text-3xl justify-center mb-4 pt-4">
-        Movie Listing
-      </div>
+     
 
-      <section className="mb-3 grid gap-2 rounded-2xl border border-slate-800 bg-slate-800/60 p-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+      <section className="m-3 grid  gap-2 rounded-2xl border border-slate-800 bg-slate-800/60 p-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <Input
           label="Search"
           type="text"
