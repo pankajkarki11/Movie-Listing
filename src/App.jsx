@@ -1,7 +1,8 @@
 import "./App.css";
 import { Route, Routes } from "react-router-dom";
-import List from "./pages/Listing";
+// import List from "./pages/Listing";
 import ListingPro from "./pages/tries/ListingPro";
+import List from "./pages/tries/SearchingDemo";
 
 function App() {
   return (
