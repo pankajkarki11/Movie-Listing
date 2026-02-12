@@ -42,6 +42,8 @@ const List = () => {
   const [searchTerm,    setSearchTerm]    = useState("");
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [scrollTop, setScrollTop] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+
 
   const searchState = useTableSearches();
 
@@ -226,6 +228,14 @@ const List = () => {
           >
             📥 Export CSV ({columnFiltered.length})
           </button>
+
+          <button
+        className="bg-red-500 text-white hover:bg-red-600 border-b-4 border-red-600 px-4 py-2 rounded-lg"
+        
+        onClick={()=>{setIsVisible(!isVisible)
+            clearAllFilters();
+        }}
+        >{isVisible ? "Close Search" : "Search Table"}</button>
         </div>
       </section>
 
@@ -278,19 +288,21 @@ const List = () => {
                   </Table.HeaderCell>
 
                   <Table.HeaderCell className="hidden sm:table-cell" width={100}
-                  searchable dataKey="id"
+                  searchable={isVisible}
+  dataKey={isVisible ? "id" : undefined}
                   >
                     ID
                   </Table.HeaderCell>
 
-                  <Table.HeaderCell searchable dataKey="title">
+                  <Table.HeaderCell  searchable={isVisible}
+  dataKey={isVisible ? "title" : undefined}>
                     Title
                   </Table.HeaderCell>
 
                   <Table.HeaderCell
                     className="hidden md:table-cell"
-                    searchable
-                    dataKey="release_date"
+                     searchable={isVisible}
+  dataKey={isVisible ? "release_date" : undefined}
                     width={160}
                   >
                     Release Date
@@ -298,14 +310,15 @@ const List = () => {
 
                   <Table.HeaderCell
                     className="hidden lg:table-cell"
-                    searchable
-                    dataKey="genres"
+                    searchable={isVisible}
+  dataKey={isVisible ? "genres" : undefined}
                     width={200}
                   >
                     Genres
                   </Table.HeaderCell>
 
-                  <Table.HeaderCell searchable dataKey="overview">
+                  <Table.HeaderCell  searchable={isVisible}
+  dataKey={isVisible ? "overview" : undefined}>
                     Overview
                   </Table.HeaderCell>
                 </Table.Header>
