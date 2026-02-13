@@ -7,8 +7,10 @@ const Todo = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   const [todo, setTodo] = useState([]);
+  const [post, setPost] = useState([]);
 
-  const searchState = useTableSearches();
+  const todoSearchState = useTableSearches();
+   const postSearchState = useTableSearches();
 
   const fetchtodo = useCallback(async () => {
     setLoading(true);
@@ -29,11 +31,37 @@ const Todo = () => {
     fetchtodo();
   }, [fetchtodo]);
 
-  const filteredTodos = filterByColumnSearches(todo, searchState.searches);
+  const filteredTodos = filterByColumnSearches(todo, todoSearchState.searches);
 
   const clearAllFilters = () => {
-    searchState.clearSearches();
+    postSearchState.clearSearches();
+       todoSearchState.clearSearches();
   };
+
+
+   const fetchpost = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("https://jsonplaceholder.typicode.com/posts");
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const data = await res.json();
+      setPost(data);}
+    catch (err) {
+      setError(err);
+    }
+      
+     finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchpost();
+  }, [fetchpost]);
+
+
+   const filteredposts = filterByColumnSearches(post, postSearchState.searches);
 
   return (
     <div className="flex flex-col bg-slate-900 min-h-screen text-slate-100 px-4 pb-8">
@@ -71,7 +99,8 @@ const Todo = () => {
           </button>
         </div>
       ) : (
-        <Table searchState={searchState}>
+        <div>
+        <Table searchState={todoSearchState}>
           <Table.Header>
             <Table.HeaderCell className="hidden sm:table-cell" width={60}>
               #
@@ -111,7 +140,7 @@ const Todo = () => {
             </Table.HeaderCell>
           </Table.Header>
 
-          <Table.Body activeFilterCount={searchState.activeCount}>
+          <Table.Body activeFilterCount={todoSearchState.activeCount}>
             {filteredTodos.map((todo) => {
               const indexx = todo.id - 1;
 
@@ -148,6 +177,103 @@ const Todo = () => {
             })}
           </Table.Body>
         </Table>
+
+
+
+     <Table searchState={postSearchState}>
+          <Table.Header>
+            <Table.HeaderCell className="hidden sm:table-cell" width={60}>
+              #
+            </Table.HeaderCell>
+
+            <Table.HeaderCell
+              className="hidden sm:table-cell"
+              width={100}
+              searchable={isVisible}
+              dataKey={isVisible ? "id" : undefined}
+            >
+              ID
+            </Table.HeaderCell>
+
+            <Table.HeaderCell
+              searchable={isVisible}
+              dataKey={isVisible ? "userId" : undefined}
+            >
+              UserId
+            </Table.HeaderCell>
+
+            <Table.HeaderCell
+              className="hidden md:table-cell"
+              searchable={isVisible}
+              dataKey={isVisible ? "title" : undefined}
+            >
+              Title
+            </Table.HeaderCell>
+
+            <Table.HeaderCell
+              className="hidden lg:table-cell"
+              searchable={isVisible}
+              dataKey={isVisible ? "body" : undefined}
+              
+            >
+              post
+            </Table.HeaderCell>
+          </Table.Header>
+
+          <Table.Body activeFilterCount={postSearchState.activeCount}>
+            {filteredposts.map((post) => {
+              const indexx = post.id - 1;
+
+              return (
+                <Table.Row key={post.id}>
+                  {/* # */}
+                  <Table.Cell className="hidden sm:table-cell text-slate-500 text-xs tabular-nums">
+                    {indexx + 1}
+                  </Table.Cell>
+
+                  {/* ID + poster */}
+                  <Table.Cell className="hidden sm:table-cell">
+                    <div className="flex flex-col items-start gap-1.5">
+                      {post.id}
+                    </div>
+                  </Table.Cell>
+
+                  {/* Title (+ poster on mobile) */}
+                  <Table.Cell>
+                    <div className="flex items-start gap-3">{post.userId}</div>
+                  </Table.Cell>
+
+                  {/* Release date */}
+                  <Table.Cell className="hidden md:table-cell text-xs font-mono text-slate-400">
+                    {post.title}
+                  </Table.Cell>
+
+                  {/* Genres */}
+                  <Table.Cell className="hidden lg:table-cell">
+                    {post.body}
+                  </Table.Cell>
+                </Table.Row>
+              );
+            })}
+          </Table.Body>
+        </Table>
+
+
+
+
+        </div>
+
+
+
+
+
+
+
+
+
+
+
+
       )}
     </div>
   );

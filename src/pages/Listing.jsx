@@ -1,40 +1,59 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import Table from "./Table";
+import Table, { useTableSearches, filterByColumnSearches } from "./Table";
 import Input from "./Input";
-import useMovieFilters from "../utils/useMovies";
+
+const COLUMN_FILTER_FNS = {
+  release_date: (value, term) => {
+    if (!value) return false;
+    const formatted = new Date(value * 1000).toLocaleDateString("en-CA");
+    return formatted.startsWith(term.trim());
+  },
+};
+
+const ITEM_SIZE = 130;
+const BUFFER_ITEMS = 15;
+
+const getVirtualWindow = (rows, scrollTop) => {
+  const viewportH =
+    typeof window !== "undefined" ? window.innerHeight * 0.8 : 800;
+  const startIdx = Math.max(
+    0,
+    Math.floor(scrollTop / ITEM_SIZE) - BUFFER_ITEMS,
+  );
+  const endIdx = Math.min(
+    rows.length,
+    startIdx + Math.ceil(viewportH / ITEM_SIZE) + BUFFER_ITEMS * 2,
+  );
+  return {
+    visibleRows: rows.slice(startIdx, endIdx),
+    offsetY: startIdx * ITEM_SIZE,
+    totalHeight: rows.length * ITEM_SIZE,
+  };
+};
 
 const List = () => {
   const [allMovies, setAllMovies] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-  const [scrollTop, setScrollTop] = useState(0);
   const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState("all");
+  const [scrollTop, setScrollTop] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
 
-  const {
-    filters,
-    updateFilter,
-    clearFilters,
-    filteredMovies,
-    allGenres,
-    exportToCSV,
-  } = useMovieFilters(allMovies);
+  const searchState = useTableSearches();
 
   const fetchMovies = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
+      const res = await fetch(
         "https://raw.githubusercontent.com/Allyedge/movies/refs/heads/main/data/movies.json",
       );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      const data = await res.json();
       setAllMovies(data);
-    } catch (error) {
-      setError(error);
+    } catch (err) {
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -44,71 +63,142 @@ const List = () => {
     fetchMovies();
   }, [fetchMovies]);
 
-  // Virtual scrolling configuration
-  const itemSize = 130;
-  const bufferItems = 15;
+  const allGenres = useMemo(
+    () => [...new Set(allMovies.flatMap((m) => m.genres ?? []))].sort(),
+    [allMovies],
+  );
 
-  const totalHeight = useMemo(() => {
-    return Math.max(filteredMovies.length * itemSize, 100);
-  }, [filteredMovies.length]);
+  const globalFiltered = useMemo(() => {
+    let list = allMovies;
 
-  const { visibleMovies, offsetY, startIndex } = useMemo(() => {
-    const containerHeight =
-      typeof window !== "undefined" ? window.innerHeight * 0.8 : 800;
+    if (selectedGenre !== "all") {
+      list = list.filter((m) => m.genres?.includes(selectedGenre));
+    }
 
-    const startIdx = Math.max(
-      0,
-      Math.floor(scrollTop / itemSize) - bufferItems,
-    );
-    const visibleCount = Math.ceil(containerHeight / itemSize);
-    const endIndex = Math.min(
-      filteredMovies.length,
-      startIdx + visibleCount + bufferItems * 2,
-    );
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(
+        (m) =>
+          m.title?.toLowerCase().includes(q) ||
+          m.overview?.toLowerCase().includes(q),
+      );
+    }
 
-    return {
-      visibleMovies: filteredMovies.slice(startIdx, endIndex),
-      offsetY: startIdx * itemSize,
-      startIndex: startIdx,
-    };
-  }, [filteredMovies, scrollTop, bufferItems]);
+    return list;
+  }, [allMovies, selectedGenre, searchTerm]);
+
+  const columnFiltered = useMemo(
+    () =>
+      filterByColumnSearches(
+        globalFiltered,
+        searchState.searches,
+        COLUMN_FILTER_FNS,
+      ),
+    [globalFiltered, searchState.searches],
+  );
+
+  const { visibleRows, offsetY, totalHeight } = useMemo(
+    () => getVirtualWindow(columnFiltered, scrollTop),
+    [columnFiltered, scrollTop],
+  );
 
   const handleScroll = useCallback((e) => {
-    const newScrollTop = e.target.scrollTop;
-    requestAnimationFrame(() => {
-      setScrollTop(newScrollTop);
-    });
+    const top = e.target.scrollTop;
+    requestAnimationFrame(() => setScrollTop(top));
   }, []);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Reset all filters
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setSelectedGenre("all");
+    searchState.clearSearches();
+  };
+
+  const hasAnyFilter =
+    searchTerm || selectedGenre !== "all" || searchState.activeCount > 0;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CSV export (exports columnFiltered — respects both global + column filters)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const exportToCSV = useCallback(() => {
+    if (columnFiltered.length === 0) return;
+
+    const escape = (v) => {
+      if (v === null || v === undefined) return "";
+      const s = String(v);
+      return s.includes(",") || s.includes('"') || s.includes("\n")
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+
+    const headers = [
+      "ID",
+      "Title",
+      "Release Date",
+      "Genres",
+      "Overview",
+      "Poster URL",
+    ];
+    const rows = columnFiltered.map((m) =>
+      [
+        m.id,
+        escape(m.title),
+        `"${new Date(m.release_date * 1000).toLocaleDateString("en-CA")}"`,
+        escape((m.genres ?? []).join("; ")),
+        escape(m.overview),
+        escape(m.poster),
+      ].join(","),
+    );
+
+    const BOM = "\uFEFF";
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement("a"), {
+      href: url,
+      download: `movies_${new Date().toISOString().split("T")[0]}.csv`,
+      style: "visibility:hidden",
+    });
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [columnFiltered]);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="flex-col justify-center items-center bg-gray-100 min-h-screen">
-     
+    <div className="flex flex-col bg-slate-900 min-h-screen text-slate-100 px-4 pb-8">
+      <div className="flex items-center justify-between py-6 mb-2">
+        <h1 className="text-2xl font-bold tracking-tight text-white">
+          🎬 Movie Listing
+        </h1>
+      </div>
 
-      <section className="m-3 grid  gap-2 rounded-2xl border border-slate-800 bg-slate-800/60 p-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+      {/* ── Global filter bar ──────────────────────────────────────────── */}
+      <section className="mb-6 grid gap-3 rounded-2xl border border-slate-700 bg-slate-800 p-4 sm:grid-cols-[1fr_200px_auto]">
         <Input
-          label="Search"
+          label="Global Search"
           type="text"
-          placeholder="Search title or overview"
-          value={filters.searchTerm}
-          onChange={(e) => updateFilter("searchTerm", e.target.value)}
+          placeholder="Search title or overview…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
         />
 
-        <Input
-          label="Search By Title"
-          type="text"
-          placeholder="Search title..."
-          value={filters.searchTitle}
-          onChange={(e) => updateFilter("searchTitle", e.target.value)}
-        />
-
-        <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
             Genre
           </span>
           <select
-            className="h-8 rounded-xl border border-slate-700 bg-slate-950/60 px-4 text-sm text-slate-100 outline-none ring-emerald-500/60 transition focus:ring-2"
-            value={filters.selectedGenre}
-            onChange={(e) => updateFilter("selectedGenre", e.target.value)}
+            className="h-8 rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-sm text-slate-100 outline-none ring-emerald-500/50 transition focus:ring-2 focus:border-emerald-500"
+            value={selectedGenre}
+            onChange={(e) => setSelectedGenre(e.target.value)}
           >
             <option value="all">All Genres</option>
             {allGenres.map((genre) => (
@@ -119,126 +209,75 @@ const List = () => {
           </select>
         </label>
 
-        <Input
-          label="Release Date"
-          type="text"
-          placeholder="YYYY-MM-DD"
-          value={filters.searchReleaseDate}
-          onChange={(e) => updateFilter("searchReleaseDate", e.target.value)}
-        />
+        <div className="flex items-end gap-2">
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            disabled={!hasAnyFilter}
+            className="h-8 rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-sm text-slate-300 transition hover:border-slate-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            Reset all
+          </button>
+          <button
+            type="button"
+            onClick={exportToCSV}
+            disabled={columnFiltered.length === 0}
+            className="h-8 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 whitespace-nowrap"
+          >
+            📥 Export CSV ({columnFiltered.length})
+          </button>
 
-        <div className="flex flex-wrap items-center gap-2 lg:col-span-4">
-          {isVisible && (
-            <div className="flex flex-wrap items-center gap-2 lg:col-span-4">
-              <Input
-                label="Search By ID"
-                type="number"
-                placeholder="Enter movie ID..."
-                value={filters.searchId}
-                onChange={(e) => updateFilter("searchId", e.target.value)}
-              />
-
-              <Input
-                label="Search By Genres"
-                type="text"
-                placeholder="Search genres..."
-                value={filters.searchGenres}
-                onChange={(e) => updateFilter("searchGenres", e.target.value)}
-              />
-
-              <Input
-                label="Search By Overview"
-                type="text"
-                placeholder="Search overview..."
-                value={filters.searchOverview}
-                onChange={(e) => updateFilter("searchOverview", e.target.value)}
-              />
-            </div>
-          )}
-
-          <div className="ml-auto m-2 flex items-center gap-2 text-xs text-slate-400">
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="rounded-xl border border-slate-700 px-2 py-2 text-sm text-slate-200 transition hover:border-emerald-500"
-              aria-label="Reset all filters"
-            >
-              Reset filters
-            </button>
-            <button
-              type="button"
-              className="rounded-xl bg-emerald-500 px-2 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
-              onClick={exportToCSV}
-              disabled={filteredMovies.length === 0}
-              aria-label={`Export ${filteredMovies.length} movies to CSV`}
-            >
-              📥 Export to CSV ({filteredMovies.length})
-            </button>
-            <button
-              type="button"
-              className="rounded-xl border border-emerald-900 px-2 py-2 text-sm text-slate-200 transition hover:border-emerald-500"
-              onClick={() => setIsVisible(!isVisible)}
-              aria-label={
-                isVisible ? "Hide advanced search" : "Show advanced search"
-              }
-            >
-              {isVisible ? "Hide" : "Show"} Advanced Search
-            </button>
-          </div>
+          <button
+            className="h-8 text-center bg-red-500 text-white hover:bg-red-600 border-b-4 border-red-600 px-4 rounded-lg"
+            onClick={() => {
+              setIsVisible(!isVisible);
+              clearAllFilters();
+            }}
+          >
+            {isVisible ? "Close Search" : "Search Table"}
+          </button>
         </div>
       </section>
 
-      <p className="flex items-center justify-center mb-2 text-gray-600">
-        Showing {filteredMovies.length} out of {allMovies.length} movies
+      <p className="mb-3 text-xs text-slate-500 font-mono px-1">
+        Showing{" "}
+        <span className="text-emerald-400 font-semibold">
+          {columnFiltered.length}
+        </span>{" "}
+        of <span className="text-slate-300">{allMovies.length}</span> movies
+        {searchState.activeCount > 0 && (
+          <span className="text-amber-400 ml-2">
+            · {searchState.activeCount} column filter
+            {searchState.activeCount > 1 ? "s" : ""} active
+          </span>
+        )}
       </p>
 
+      {/* ── Main content ───────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex justify-center items-center h-[80vh]">
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-            <p className="text-xl text-slate-600">Loading movies...</p>
-          </div>
+        <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+          <div className="w-8 h-8 rounded-full border-2 border-slate-700 border-t-emerald-500 animate-spin" />
+          <p className="text-sm text-slate-500">Loading movies…</p>
         </div>
       ) : error ? (
-        <div className="flex justify-center items-center h-[80vh]">
-          <div className="flex flex-col items-center gap-4 max-w-md p-6 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-xl text-red-600 font-semibold">
-              Error Loading Movies
-            </p>
-            <p className="text-sm text-red-500">{error.message}</p>
-            <button
-              onClick={fetchMovies}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      ) : filteredMovies.length === 0 ? (
-        <div className="flex justify-center items-center h-[80vh]">
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-xl text-slate-600">
-              No movies found matching your filters
-            </p>
-            <button
-              onClick={clearFilters}
-              className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition"
-            >
-              Clear Filters
-            </button>
-          </div>
+        <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+          <p className="text-red-400 text-sm">{error.message}</p>
+          <button
+            onClick={fetchMovies}
+            className="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm hover:border-slate-500 transition"
+          >
+            Retry
+          </button>
         </div>
       ) : (
         <div
-          className="overflow-auto h-[80vh]"
+          className="overflow-auto rounded-xl"
+          style={{ height: "80vh", overscrollBehavior: "contain" }}
           onScroll={handleScroll}
-          style={{
-            overscrollBehavior: "contain",
-          }}
         >
           <div
             style={{
-              height: `${totalHeight}px`,
+              height: totalHeight,
               position: "relative",
               minHeight: "100%",
             }}
@@ -249,101 +288,128 @@ const List = () => {
                 willChange: "transform",
               }}
             >
-              <Table>
+              <Table searchState={searchState}>
                 <Table.Header>
-                  <Table.HeaderCell className="hidden sm:table-cell">
-                    Index
+                  <Table.HeaderCell className="hidden sm:table-cell" width={60}>
+                    #
                   </Table.HeaderCell>
-                  <Table.HeaderCell className="hidden sm:table-cell">
+
+                  <Table.HeaderCell
+                    className="hidden sm:table-cell"
+                    width={100}
+                    searchable={isVisible}
+                    dataKey={isVisible ? "id" : undefined}
+                  >
                     ID
                   </Table.HeaderCell>
-                  <Table.HeaderCell>Title</Table.HeaderCell>
-                  <Table.HeaderCell className="hidden md:table-cell">
+
+                  <Table.HeaderCell
+                    searchable={isVisible}
+                    dataKey={isVisible ? "title" : undefined}
+                  >
+                    Title
+                  </Table.HeaderCell>
+
+                  <Table.HeaderCell
+                    className="hidden md:table-cell"
+                    searchable={isVisible}
+                    dataKey={isVisible ? "release_date" : undefined}
+                    width={160}
+                  >
                     Release Date
                   </Table.HeaderCell>
-                  <Table.HeaderCell className="hidden lg:table-cell">
-                    Genre
+
+                  <Table.HeaderCell
+                    className="hidden lg:table-cell"
+                    searchable={isVisible}
+                    dataKey={isVisible ? "genres" : undefined}
+                    width={200}
+                  >
+                    Genres
                   </Table.HeaderCell>
-                  <Table.HeaderCell>Overview</Table.HeaderCell>
+
+                  <Table.HeaderCell
+                    searchable={isVisible}
+                    dataKey={isVisible ? "overview" : undefined}
+                  >
+                    Overview
+                  </Table.HeaderCell>
                 </Table.Header>
 
-                <Table.Body>
-                  {visibleMovies.map((movie, idx) => {
-                    const actualIndex = startIndex + idx;
+                <Table.Body
+                  isEmpty={columnFiltered.length === 0}
+                  activeFilterCount={searchState.activeCount}
+                >
+                  {visibleRows.map((movie) => {
+                    const index = columnFiltered.findIndex(
+                      (m) => m.id === movie.id,
+                    );
 
                     return (
                       <Table.Row key={movie.id}>
-                        <Table.Cell className="hidden sm:table-cell">
-                          {actualIndex + 1}
+                        {/* # */}
+                        <Table.Cell className="hidden sm:table-cell text-slate-500 text-xs tabular-nums">
+                          {index + 1}
                         </Table.Cell>
 
+                        {/* ID + poster */}
                         <Table.Cell className="hidden sm:table-cell">
-                          <div className="flex h-15 w-20">
-                            {movie.poster ? (
+                          <div className="flex flex-col items-start gap-1.5">
+                            <div className="h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
                               <img
-                                className="h-16 w-12 rounded-lg object-cover shadow-lg"
                                 src={movie.poster}
-                                alt={`${movie.title || "Movie"} poster`}
+                                alt={`${movie.title} poster`}
                                 loading="lazy"
-                                onError={(e) => {
-                                  e.target.src =
-                                    "https://via.placeholder.com/80x120?text=No+Image";
-                                }}
+                                className="h-full w-full object-cover"
                               />
-                            ) : (
-                              <div className="flex items-center justify-center w-full h-full bg-slate-200 text-slate-400 text-xs">
-                                No Image
-                              </div>
-                            )}
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {movie.id}
+                            </span>
                           </div>
-                          ID: {movie.id}
                         </Table.Cell>
 
-                        <Table.Cell className="text-lg">
-                          {movie.poster && (
-                            <img
-                              className="sm:hidden h-20 w-20"
-                              src={movie.poster}
-                              alt={`${movie.title || "Movie"} poster`}
-                              loading="lazy"
-                              onError={(e) => {
-                                e.target.src =
-                                  "https://via.placeholder.com/80x120?text=No+Image";
-                              }}
-                            />
-                          )}
-                          {movie.title || "Untitled"}
+                        {/* Title (+ poster on mobile) */}
+                        <Table.Cell>
+                          <div className="flex items-start gap-3">
+                            <div className="sm:hidden h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
+                              <img
+                                src={movie.poster}
+                                alt={`${movie.title} poster`}
+                                loading="lazy"
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                            <span className="text-sm font-medium text-white leading-snug">
+                              {movie.title}
+                            </span>
+                          </div>
                         </Table.Cell>
 
-                        <Table.Cell className="hidden md:table-cell">
-                          {movie.release_date
-                            ? new Date(
-                                movie.release_date * 1000,
-                              ).toLocaleDateString("en-CA")
-                            : "N/A"}
+                        {/* Release date */}
+                        <Table.Cell className="hidden md:table-cell text-xs font-mono text-slate-400">
+                          {new Date(
+                            movie.release_date * 1000,
+                          ).toLocaleDateString("en-CA")}
                         </Table.Cell>
 
+                        {/* Genres */}
                         <Table.Cell className="hidden lg:table-cell">
                           <div className="flex flex-wrap gap-1">
-                            {movie.genres && movie.genres.length > 0 ? (
-                              movie.genres.map((genre) => (
-                                <div
-                                  key={genre}
-                                  className="bg-slate-200 text-gray-800 px-2 py-1 rounded-full text-xs border border-slate-300"
-                                >
-                                  {genre}
-                                </div>
-                              ))
-                            ) : (
-                              <span className="text-slate-400 text-xs">
-                                No genres
+                            {(movie.genres ?? []).map((genre, i) => (
+                              <span
+                                key={i}
+                                className="bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md text-[11px]"
+                              >
+                                {genre}
                               </span>
-                            )}
+                            ))}
                           </div>
                         </Table.Cell>
 
-                        <Table.Cell>
-                          {movie.overview || "No overview available"}
+                        {/* Overview */}
+                        <Table.Cell className="text-xs text-slate-400 leading-relaxed">
+                          {movie.overview}
                         </Table.Cell>
                       </Table.Row>
                     );
