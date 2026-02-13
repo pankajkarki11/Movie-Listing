@@ -230,7 +230,8 @@ const List = () => {
           </button>
 
           <button
-        className="bg-red-500 text-white hover:bg-red-600 border-b-4 border-red-600 px-4 py-2 rounded-lg"
+    className="h-8 text-center bg-red-500 text-white hover:bg-red-600 border-b-4 border-red-600 px-4 rounded-lg"
+
         
         onClick={()=>{setIsVisible(!isVisible)
             clearAllFilters();
