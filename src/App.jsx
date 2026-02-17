@@ -4,7 +4,7 @@ import { Route, Routes } from "react-router-dom";
 import ListingPro from "./pages/tries/ListingPro";
 import List from "./pages/Listing";
 import Todo from "./pages/tries/todo";
-import Tabless from "./pages/Ag-gridListing";
+import MovieList from "./pages/Ag-gridListing";
 
 function App() {
   return (
@@ -17,7 +17,7 @@ function App() {
         <Route path="/todo" element={<Todo />} />
 
       
-        <Route path="/table" element={<Tabless />} />
+        <Route path="/table" element={<MovieList />} />
       </Routes>
     </>
   );
