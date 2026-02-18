@@ -6,8 +6,7 @@ const MovieList2 = () => {
   const [allMovies, setAllMovies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedGenre, setSelectedGenre] = useState("all");
+
 
   const fetchMovies = useCallback(async () => {
     setLoading(true);
@@ -34,42 +33,10 @@ const MovieList2 = () => {
     fetchMovies();
   }, [fetchMovies]);
 
-  // Get all unique genres
-  const allGenres = useMemo(() => {
-    if (!allMovies.length) return [];
-    
-    const genres = allMovies.flatMap((m) => m.genres ?? []);
-    return [...new Set(genres)].sort();
-  }, [allMovies]);
 
-  // Global filtering (genre + search term)
-  const globalFiltered = useMemo(() => {
-    if (!allMovies.length) return [];
-    
-    let list = [...allMovies];
 
-    if (selectedGenre !== "all") {
-      list = list.filter((m) => m.genres?.includes(selectedGenre));
-    }
 
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase().trim();
-      list = list.filter((m) => 
-        m.title?.toLowerCase().includes(q) || 
-        m.overview?.toLowerCase().includes(q)
-      );
-    }
 
-    return list;
-  }, [allMovies, selectedGenre, searchTerm]);
-
-  // Clear all filters
-  const clearAllFilters = useCallback(() => {
-    setSearchTerm("");
-    setSelectedGenre("all");
-  }, []);
-
-  const hasAnyFilter = searchTerm || selectedGenre !== "all";
 
   // Column definitions with fixed date filtering
   const columnDefs = useMemo(
@@ -83,14 +50,14 @@ const MovieList2 = () => {
         pinned: "left",
       },
       {
-        field: "poster",
-        headerName: "Poster",
+        field: "id",
+        headerName: "ID",
         width: 120,
         cellRenderer: (params) => (
           <div className="flex flex-col items-center gap-1 py-2">
             <div className="h-20 w-14 overflow-hidden rounded-md bg-slate-800 shadow-lg">
               <img
-                src={params.value}
+                src={params.data.poster}
                 alt={params.data.title}
                 loading="lazy"
                 className="h-full w-full object-cover"
@@ -201,59 +168,9 @@ const MovieList2 = () => {
         </h1>
       </div>
 
-      {/* Global filter bar */}
-      <section className="mb-6 grid gap-3 rounded-2xl border border-slate-700 bg-slate-800 p-4 sm:grid-cols-[1fr_200px_auto]">
-        <Input
-          label="Global Search"
-          type="text"
-          placeholder="Search title or overview…"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-            Genre
-          </span>
-          <select
-            className="h-8 rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-sm text-slate-100 outline-none ring-emerald-500/50 transition focus:ring-2 focus:border-emerald-500"
-            value={selectedGenre}
-            onChange={(e) => setSelectedGenre(e.target.value)}
-          >
-            <option value="all">All Genres</option>
-            {allGenres.map((genre) => (
-              <option key={genre} value={genre}>
-                {genre}
-              </option>
-            ))}
-          </select>
-        </label>
 
-        <div className="flex items-end gap-2">
-          <button
-            type="button"
-            onClick={clearAllFilters}
-            disabled={!hasAnyFilter}
-            className="h-8 rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-sm text-slate-300 transition hover:border-slate-500 disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            Reset Global
-          </button>
-        </div>
-      </section>
 
-      {/* Stats */}
-      <p className="mb-3 text-xs text-slate-500 font-mono px-1">
-        Showing{" "}
-        <span className="text-emerald-400 font-semibold">
-          {globalFiltered.length}
-        </span>{" "}
-        of <span className="text-slate-300">{allMovies.length}</span> movies
-        {hasAnyFilter && (
-          <span className="text-amber-400 ml-2">
-            · Global filters active
-          </span>
-        )}
-      </p>
 
       {/* Main content */}
       {loading ? (
@@ -273,7 +190,7 @@ const MovieList2 = () => {
         </div>
       ) : (
         <AGTable
-          rowData={globalFiltered}
+          rowData={allMovies}
           columnDefs={columnDefs}
           enableGlobalSearch={true}
           enableColumnFilter={true}
