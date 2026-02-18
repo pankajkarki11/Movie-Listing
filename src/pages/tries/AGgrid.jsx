@@ -92,7 +92,7 @@ Table.Header = ({ children, className = "" }) => {
   const { searches, setSearch, columnDataKeys } = useContext(TableContext);
 
   const hasSearchableColumns = columnDataKeys.some(key => key);
-
+                                                  
   return (
     <thead>
       <tr className={`bg-slate-900 ${className}`}>{children}</tr>
@@ -255,10 +255,7 @@ Table.Cell = ({ children, className = "", width, dataKey, ...props }) => {
   );
 };
 
-// Context for tracking cell indices
 const CellIndexContext = createContext(undefined);
-
-// Wrapper component to provide cell indices to cells in a row
 Table.Row = ({ children, className = "", hover = true, ...props }) => {
   return (
     <tr

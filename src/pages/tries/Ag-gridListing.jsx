@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Table, { useTableSearches, filterByColumnSearches } from "./AGgrid";
-import Input from "./Input";
+import Input from "../Input";
 
 const COLUMN_FILTER_FNS = {
   release_date: (value, term) => {
@@ -31,7 +31,7 @@ const getVirtualWindow = (rows, scrollTop) => {
   };
 };
 
-const List = () => {
+const MovieList = () => {
   const [allMovies, setAllMovies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -297,6 +297,9 @@ const List = () => {
                   <Table.HeaderCell>
                     Overview
                   </Table.HeaderCell>
+                    <Table.HeaderCell>
+                    Overview
+                  </Table.HeaderCell>
                 </Table.Header>
 
                 <Table.Body
@@ -307,6 +310,7 @@ const List = () => {
                     const index = columnFiltered.findIndex(
                       (m) => m.id === movie.id,
                     );
+                  
 
                     return (
                       <Table.Row key={movie.id}>
@@ -315,7 +319,7 @@ const List = () => {
                           {index + 1}
                         </Table.Cell>
 
-                        {/* ID + poster - searchable by id */}
+                       
                         <Table.Cell className="hidden sm:table-cell" dataKey="id">
                           <div className="flex flex-col items-start gap-1.5">
                             <div className="h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
@@ -332,7 +336,7 @@ const List = () => {
                           </div>
                         </Table.Cell>
 
-                        {/* Title - searchable by title */}
+                       
                         <Table.Cell dataKey="title">
                           <div className="flex items-start gap-3">
                             <div className="sm:hidden h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
@@ -349,14 +353,14 @@ const List = () => {
                           </div>
                         </Table.Cell>
 
-                        {/* Release date - searchable by release_date */}
+                      
                         <Table.Cell className="hidden md:table-cell text-xs font-mono text-slate-400" dataKey="release_date">
                           {new Date(
                             movie.release_date * 1000,
                           ).toLocaleDateString("en-CA")}
                         </Table.Cell>
 
-                        {/* Genres - searchable by genres */}
+               
                         <Table.Cell className="hidden lg:table-cell" dataKey="genres">
                           <div className="flex flex-wrap gap-1">
                             {(movie.genres ?? []).map((genre, i) => (
@@ -370,8 +374,11 @@ const List = () => {
                           </div>
                         </Table.Cell>
 
-                        {/* Overview - searchable by overview */}
+              
                         <Table.Cell className="text-xs text-slate-400 leading-relaxed" dataKey="overview">
+                          {movie.overview}
+                        </Table.Cell>
+                         <Table.Cell className="text-xs text-slate-400 leading-relaxed" dataKey="overview">
                           {movie.overview}
                         </Table.Cell>
                       </Table.Row>
@@ -387,4 +394,4 @@ const List = () => {
   );
 };
 
-export default List;
+export default MovieList;
