@@ -3,13 +3,22 @@ import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-alpine.css";
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+import { 
+  Search, 
+  X, 
+  Filter, 
+  Download, 
+  Table as TableIcon,
+  Loader2
+} from 'lucide-react';
+import Input from "../Input";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 const Column = () => null;
 Column.displayName = "AGTable.Column";
 
-// Built-in cell renderers
+
 const CellRenderers = {
   image: (params) => {
     const { value, data, imageField = 'poster', titleField = 'title', idField = 'id' } = params;
@@ -25,10 +34,7 @@ const CellRenderers = {
             alt={title}
             loading="lazy"
             className="h-full w-full object-cover"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='80' viewBox='0 0 56 80'%3E%3Crect fill='%231e293b' width='56' height='80'/%3E%3Ctext x='50%25' y='50%25' fill='%2364748b' font-size='10' text-anchor='middle' dy='.3em'%3ENo Image%3C/text%3E%3C/svg%3E";
-            }}
+      
           />
         </div>
         {id && (
@@ -88,29 +94,28 @@ const CellRenderers = {
   },
 };
 
-// Auto-detect field type with enhanced logic
+
 const detectFieldType = (field, data) => {
   const fieldLower = field?.toLowerCase() || "";
-  
-  // Image detection
+ 
   if (fieldLower.includes("image") || fieldLower.includes("poster") || 
       fieldLower.includes("photo") || fieldLower.includes("picture") || 
       fieldLower.includes("avatar") || fieldLower.includes("thumbnail")) {
     return "image";
   }
   
-  // Date detection
+ 
   if (fieldLower.includes("date") || fieldLower.includes("time") || fieldLower.includes("created") || fieldLower.includes("updated")) {
     return "date";
   }
   
-  // Number detection
+
   if (fieldLower.includes("count") || fieldLower.includes("price") || fieldLower.includes("rating") || 
       fieldLower.includes("age") || fieldLower.includes("amount") || fieldLower.includes("total")) {
     return "number";
   }
   
-  // Array detection (for tags/badges)
+ 
   if (data && data.length > 0) {
     const sampleValue = data[0][field];
     if (Array.isArray(sampleValue)) {
@@ -121,7 +126,7 @@ const detectFieldType = (field, data) => {
   return "text";
 };
 
-// Build column definition from Column component props
+
 const buildColumnDef = (child, enableColumnFilter, rowData) => {
   if (!child || child.type !== Column) return null;
 
@@ -138,11 +143,11 @@ const buildColumnDef = (child, enableColumnFilter, rowData) => {
     filter: customFilter,
     filterParams,
     type: columnType,
-    dateFormat = "unix", // 'iso', 'unix', 'custom'
+    dateFormat = "unix",
     dateComparator,
     render,
     cellRenderer: customCellRenderer,
-    cellRendererType, // 'image', 'tags', 'text', 'clampedText', 'rowNumber'
+    cellRendererType,
     cellRendererParams = {},
     valueGetter,
     valueFormatter,
@@ -227,7 +232,6 @@ const buildColumnDef = (child, enableColumnFilter, rowData) => {
             textMatcher: ({ filterOption, value, filterText }) => {
               if (!value || !filterText) return false;
               
-              // Handle array values
               if (Array.isArray(value)) {
                 return value.some(item => 
                   String(item).toLowerCase().includes(filterText.toLowerCase())
@@ -406,7 +410,6 @@ const AGTable = ({
     }
   }, [exportFileName]);
 
-  // Clear all filters
   const onClearFilters = useCallback(() => {
     if (gridRef.current?.api) {
       gridRef.current.api.setFilterModel(null);
@@ -446,22 +449,10 @@ const AGTable = ({
               <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 rounded-xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-300" />
               
               <span className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-emerald-400 transition-colors duration-200 z-10">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
+                <Search size={16} />
               </span>
 
-              <input
+              <Input
                 type="text"
                 value={globalSearchText}
                 onChange={(e) => onFilterTextChange(e.target.value)}
@@ -482,17 +473,7 @@ const AGTable = ({
                   className="absolute inset-y-0 right-4 flex items-center text-slate-500 hover:text-emerald-400 transition-colors duration-150 z-10"
                   aria-label="Clear search"
                 >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  >
-                    <path d="M18 6 6 18M6 6l12 12" />
-                  </svg>
+                  <X size={14} />
                 </button>
               )}
             </div>
@@ -506,16 +487,7 @@ const AGTable = ({
             <div className="flex items-center gap-2">
               {activeFilterCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium backdrop-blur-sm">
-                  <svg
-                    width="11"
-                    height="11"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                  </svg>
+                  <Filter size={11} />
                   {activeFilterCount} filter{activeFilterCount !== 1 ? "s" : ""}
                 </span>
               )}
@@ -546,21 +518,7 @@ const AGTable = ({
               "
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="relative"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
+              <Download size={15} className="relative" />
               <span className="relative">Export CSV</span>
             </button>
           )}
@@ -578,25 +536,14 @@ const AGTable = ({
               <div className="w-12 h-12 rounded-full border-4 border-slate-700 border-t-emerald-500 animate-spin" />
               <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-transparent border-t-teal-400 animate-spin animation-delay-150" style={{ animationDirection: 'reverse' }} />
             </div>
-            <p className="mt-6 text-sm text-slate-500 font-medium">Loading data...</p>
+            <p className="mt-6 text-sm text-slate-500 font-medium flex items-center gap-2">
+              <Loader2 size={14} className="animate-spin" />
+              Loading data...
+            </p>
           </div>
         ) : finalRowData.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full bg-slate-900">
-            <svg
-              width="64"
-              height="64"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-slate-700 mb-4"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M3 9h18" />
-              <path d="M9 21V9" />
-            </svg>
+            <TableIcon size={64} className="text-slate-700 mb-4" strokeWidth={1.5} />
             <p className="text-sm text-slate-500">{emptyMessage}</p>
           </div>
         ) : (

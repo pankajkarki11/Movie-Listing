@@ -89,6 +89,7 @@ const MovieList = () => {
           <AGTable.Column
             field="poster"
             header="Poster"
+           
             width={120}
             filter={false}
             sortable={false}
@@ -107,6 +108,7 @@ const MovieList = () => {
             header="Title"
             flex={2}
             minWidth={200}
+            cellRendererType="text"
           
           />
 
@@ -123,6 +125,8 @@ const MovieList = () => {
             field="genres"
             header="Genres"
             width={250}
+            cellRendererType="tags"
+            cellRendererParams={{ limit: 3 }}
           />
 
          
