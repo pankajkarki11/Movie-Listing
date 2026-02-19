@@ -9,16 +9,120 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 const Column = () => null;
 Column.displayName = "AGTable.Column";
 
-// Auto-detect field type
-const detectFieldType = (field) => {
+// Built-in cell renderers
+const CellRenderers = {
+  image: (params) => {
+    const { value, data, imageField = 'poster', titleField = 'title', idField = 'id' } = params;
+    const imageSrc = imageField ? data[imageField] : value;
+    const title = titleField ? data[titleField] : '';
+    const id = idField ? data[idField] : '';
+    
+    return (
+      <div className="flex flex-col items-center gap-1 py-2">
+        <div className="h-20 w-14 overflow-hidden rounded-md bg-slate-800 shadow-lg">
+          <img
+            src={imageSrc}
+            alt={title}
+            loading="lazy"
+            className="h-full w-full object-cover"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='80' viewBox='0 0 56 80'%3E%3Crect fill='%231e293b' width='56' height='80'/%3E%3Ctext x='50%25' y='50%25' fill='%2364748b' font-size='10' text-anchor='middle' dy='.3em'%3ENo Image%3C/text%3E%3C/svg%3E";
+            }}
+          />
+        </div>
+        {id && (
+          <span className="text-[9px] text-slate-500 font-mono">
+            #{id}
+          </span>
+        )}
+      </div>
+    );
+  },
+
+  tags: (params) => {
+    const { value = [], emptyText = 'No tags', tagClassName = '' } = params;
+    const tags = Array.isArray(value) ? value : [];
+    
+    return (
+      <div className="flex flex-wrap gap-1 py-1">
+        {tags.map((tag, i) => (
+          <span
+            key={i}
+            className={tagClassName || "bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md text-[10px] whitespace-nowrap"}
+          >
+            {tag}
+          </span>
+        ))}
+        {tags.length === 0 && (
+          <span className="text-slate-600 text-xs">{emptyText}</span>
+        )}
+      </div>
+    );
+  },
+
+  text: (params) => {
+    const { value, emptyText = 'N/A', className = '' } = params;
+    return (
+      <span className={className || "font-medium text-white"}>
+        {value || emptyText}
+      </span>
+    );
+  },
+
+  clampedText: (params) => {
+    const { value, emptyText = 'No content available', lines = 3 } = params;
+    return (
+      <div className={`line-clamp-${lines}`}>
+        {value || emptyText}
+      </div>
+    );
+  },
+
+  rowNumber: (params) => {
+    return (
+      <span className="font-mono text-slate-400">
+        {params.node.rowIndex + 1}
+      </span>
+    );
+  },
+};
+
+// Auto-detect field type with enhanced logic
+const detectFieldType = (field, data) => {
   const fieldLower = field?.toLowerCase() || "";
-  if (fieldLower.includes("date") || fieldLower.includes("time")) return "date";
-  if ( fieldLower.includes("count") || fieldLower.includes("price") || fieldLower.includes("rating")) return "number";
+  
+  // Image detection
+  if (fieldLower.includes("image") || fieldLower.includes("poster") || 
+      fieldLower.includes("photo") || fieldLower.includes("picture") || 
+      fieldLower.includes("avatar") || fieldLower.includes("thumbnail")) {
+    return "image";
+  }
+  
+  // Date detection
+  if (fieldLower.includes("date") || fieldLower.includes("time") || fieldLower.includes("created") || fieldLower.includes("updated")) {
+    return "date";
+  }
+  
+  // Number detection
+  if (fieldLower.includes("count") || fieldLower.includes("price") || fieldLower.includes("rating") || 
+      fieldLower.includes("age") || fieldLower.includes("amount") || fieldLower.includes("total")) {
+    return "number";
+  }
+  
+  // Array detection (for tags/badges)
+  if (data && data.length > 0) {
+    const sampleValue = data[0][field];
+    if (Array.isArray(sampleValue)) {
+      return "array";
+    }
+  }
+  
   return "text";
 };
 
 // Build column definition from Column component props
-const buildColumnDef = (child, enableColumnFilter) => {
+const buildColumnDef = (child, enableColumnFilter, rowData) => {
   if (!child || child.type !== Column) return null;
 
   const {
@@ -34,10 +138,12 @@ const buildColumnDef = (child, enableColumnFilter) => {
     filter: customFilter,
     filterParams,
     type: columnType,
-    dateFormat = "iso", // 'iso', 'unix', 'custom'
+    dateFormat = "unix", // 'iso', 'unix', 'custom'
     dateComparator,
     render,
-    cellRenderer,
+    cellRenderer: customCellRenderer,
+    cellRendererType, // 'image', 'tags', 'text', 'clampedText', 'rowNumber'
+    cellRendererParams = {},
     valueGetter,
     valueFormatter,
     cellClass = "",
@@ -47,10 +153,12 @@ const buildColumnDef = (child, enableColumnFilter) => {
     editable = false,
     autoHeight = false,
     wrapText = false,
+    emptyText,
     ...restProps
   } = child.props;
 
-  const autoType = detectFieldType(field);
+
+  const autoType = detectFieldType(field, rowData);
   const finalType = columnType || autoType;
 
   const colDef = {
@@ -65,46 +173,72 @@ const buildColumnDef = (child, enableColumnFilter) => {
     ...restProps,
   };
 
-  // Width settings
+ 
   if (width) colDef.width = width;
   if (minWidth) colDef.minWidth = minWidth;
   if (maxWidth) colDef.maxWidth = maxWidth;
   if (flex) colDef.flex = flex;
   if (pinned) colDef.pinned = pinned;
 
-  // Filter configuration
+ 
   if (enableColumnFilter) {
     if (customFilter !== undefined) {
       colDef.filter = customFilter;
     } else {
       switch (finalType) {
         case "date":
-          colDef.filter = "agDateColumnFilter";
+          
+          colDef.filter = "agTextColumnFilter";
           colDef.filterParams = {
-            comparator: dateComparator || ((filterDate, cellValue) => {
-              if (!cellValue) return -1;
+            textMatcher: ({ filterOption, value, filterText }) => {
+              if (!value || !filterText) return false;
               
-              let cellDate;
-              if (dateFormat === "unix") {
-                cellDate = new Date(cellValue * 1000);
-              } else {
-                cellDate = new Date(cellValue);
+             
+              let dateStr;
+              try {
+                if (dateFormat === "unix") {
+                  dateStr = new Date(value * 1000).toLocaleDateString("en-CA");
+                } else {
+                  dateStr = new Date(value).toLocaleDateString("en-CA");
+                }
+              } catch {
+                return false;
               }
               
-              cellDate.setHours(0, 0, 0, 0);
+         
+              const normalizedFilter = filterText.trim().toLowerCase();
+              const normalizedDate = dateStr.toLowerCase();
               
-              if (cellDate < filterDate) return -1;
-              if (cellDate > filterDate) return 1;
-              return 0;
-            }),
-            browserDatePicker: true,
-            inRangeFloatingFilterDateFormat: "YYYY-MM-DD",
+           
+              return normalizedDate.startsWith(normalizedFilter) || 
+                     normalizedDate.includes(normalizedFilter);
+            },
             ...filterParams,
           };
           break;
         case "number":
           colDef.filter = "agNumberColumnFilter";
           if (filterParams) colDef.filterParams = filterParams;
+          break;
+        case "array":
+        
+          colDef.filter = "agTextColumnFilter";
+          colDef.filterParams = {
+            textMatcher: ({ filterOption, value, filterText }) => {
+              if (!value || !filterText) return false;
+              
+              // Handle array values
+              if (Array.isArray(value)) {
+                return value.some(item => 
+                  String(item).toLowerCase().includes(filterText.toLowerCase())
+                );
+              }
+              
+      
+              return String(value).toLowerCase().includes(filterText.toLowerCase());
+            },
+            ...filterParams,
+          };
           break;
         default:
           colDef.filter = "agTextColumnFilter";
@@ -113,10 +247,10 @@ const buildColumnDef = (child, enableColumnFilter) => {
     }
   }
 
-  // Value formatter for dates
-  if (finalType === "date" && !valueFormatter && !render && !cellRenderer) {
+
+  if (finalType === "date" && !valueFormatter && !render && !customCellRenderer && !cellRendererType) {
     colDef.valueFormatter = (params) => {
-      if (!params.value) return "N/A";
+      if (!params.value) return emptyText || "N/A";
       try {
         let date;
         if (dateFormat === "unix") {
@@ -124,32 +258,70 @@ const buildColumnDef = (child, enableColumnFilter) => {
         } else {
           date = new Date(params.value);
         }
-        return date.toLocaleDateString("en-CA"); // YYYY-MM-DD
+        return date.toLocaleDateString("en-CA"); 
       } catch {
         return "Invalid Date";
       }
     };
   }
 
-  // Custom value formatter
+
   if (valueFormatter) {
     colDef.valueFormatter = valueFormatter;
   }
 
-  // Custom cell renderer
+
   if (render) {
     colDef.cellRenderer = (params) => render(params.value, params.data, params);
-  } else if (cellRenderer) {
-    colDef.cellRenderer = cellRenderer;
+  } else if (cellRendererType && CellRenderers[cellRendererType]) {
+    colDef.cellRenderer = (params) => CellRenderers[cellRendererType]({ 
+      ...params, 
+      ...cellRendererParams,
+      emptyText: emptyText || cellRendererParams.emptyText,
+    });
+  } else if (customCellRenderer) {
+    colDef.cellRenderer = customCellRenderer;
+  } else if (finalType === "image") {
+    
+    colDef.cellRenderer = (params) => {
+      const imageSrc = params.value;
+      if (!imageSrc) return <span className="text-slate-500 text-xs">No image</span>;
+      
+      return (
+        <div className="flex items-center justify-center py-2">
+          <img
+            src={imageSrc}
+            alt={params.data[field] || "Image"}
+            loading="lazy"
+            className="h-20 w-auto max-w-[80px] object-cover rounded-md shadow-lg"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Crect fill='%231e293b' width='80' height='80'/%3E%3Ctext x='50%25' y='50%25' fill='%2364748b' font-size='10' text-anchor='middle' dy='.3em'%3ENo Image%3C/text%3E%3C/svg%3E";
+            }}
+          />
+        </div>
+      );
+    };
+  } else if (finalType === "array") {
+
+    colDef.cellRenderer = (params) => CellRenderers.tags({ 
+      ...params, 
+      emptyText: emptyText || "No items",
+    });
   }
 
-  // Custom value getter
+
   if (valueGetter) {
     colDef.valueGetter = valueGetter;
   }
 
-  // Cell styling
-  colDef.cellClass = `text-slate-200 text-sm flex items-center ${cellClass}`;
+ 
+
+  const defaultCellClass = finalType === "date" 
+    ? "text-slate-400 font-mono text-sm flex items-center"
+    : "text-slate-200 text-sm flex items-center";
+  
+  colDef.cellClass = `${defaultCellClass} ${cellClass}`;
   colDef.headerClass = `font-semibold text-xs uppercase tracking-wider text-slate-400 ${headerClass}`;
 
   return colDef;
@@ -158,8 +330,8 @@ const buildColumnDef = (child, enableColumnFilter) => {
 const AGTable = ({
   children,
   data = [],
-  rowData, // Alias for data
-  columnDefs: externalColumnDefs, // External column defs (overrides children)
+  rowData, 
+  columnDefs: externalColumnDefs, 
   defaultColDef: customDefaultColDef,
   enableGlobalSearch = true,
   enableColumnFilter = true,
@@ -170,7 +342,7 @@ const AGTable = ({
   onSelectionChanged,
   onGridReady,
   className = "",
-  theme = "dark", // 'dark' or 'light'
+  theme = "dark", 
   loading = false,
   emptyMessage = "No data available",
   searchPlaceholder = "Search across all columns...",
@@ -179,10 +351,10 @@ const AGTable = ({
   const [globalSearchText, setGlobalSearchText] = useState("");
   const [activeFilterCount, setActiveFilterCount] = useState(0);
 
-  // Use rowData if provided, otherwise use data
+  
   const finalRowData = rowData || data;
 
-  // Build column definitions from children
+
   const childColumnDefs = useMemo(() => {
     if (externalColumnDefs) return externalColumnDefs;
     
@@ -190,14 +362,14 @@ const AGTable = ({
     const childArray = Array.isArray(children) ? children : [children];
     
     childArray.forEach((child) => {
-      const colDef = buildColumnDef(child, enableColumnFilter);
+      const colDef = buildColumnDef(child, enableColumnFilter, finalRowData);
       if (colDef) columns.push(colDef);
     });
     
     return columns;
-  }, [children, externalColumnDefs, enableColumnFilter]);
+  }, [children, externalColumnDefs, enableColumnFilter, finalRowData]);
 
-  // Default column definitions
+
   const defaultColDef = useMemo(
     () => ({
       sortable: true,
@@ -215,7 +387,7 @@ const AGTable = ({
     [enableColumnFilter, customDefaultColDef]
   );
 
-  // Global search filter
+
   const onFilterTextChange = useCallback((text) => {
     setGlobalSearchText(text);
     if (gridRef.current?.api) {
@@ -223,7 +395,7 @@ const AGTable = ({
     }
   }, []);
 
-  // Export to CSV
+
   const onExportCSV = useCallback(() => {
     if (gridRef.current?.api) {
       const params = {
@@ -243,7 +415,7 @@ const AGTable = ({
     }
   }, []);
 
-  // Track active filters
+
   const onFilterChanged = useCallback(() => {
     if (gridRef.current?.api) {
       const filterModel = gridRef.current.api.getFilterModel();
@@ -251,7 +423,7 @@ const AGTable = ({
     }
   }, []);
 
-  // Handle grid ready
+
   const handleGridReady = useCallback(
     (params) => {
       if (onGridReady) {
@@ -633,7 +805,6 @@ const AGTable = ({
   );
 };
 
-// Attach Column as a static property
 AGTable.Column = Column;
 
 export default AGTable;
