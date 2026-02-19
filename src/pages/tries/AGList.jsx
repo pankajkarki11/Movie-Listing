@@ -196,7 +196,6 @@ const MovieList2 = () => {
           enableColumnFilter={true}
           enableExport={true}
           exportFileName={`movies_${new Date().toISOString().split("T")[0]}`}
-          height={typeof window !== 'undefined' ? window.innerHeight * 0.65 : 600}
           gridOptions={{
             // Remove pagination, use virtualization instead
             rowHeight: 140,
