@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+// MovieList2.jsx - FIXED VERSION
+import { useState, useEffect, useCallback, useMemo } from "react";
 import AGTable from "./AGTable2";
 
-const MovieList = () => {
+const MovieList2 = () => {
   const [allMovies, setAllMovies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -13,9 +14,7 @@ const MovieList = () => {
       const res = await fetch(
         "https://raw.githubusercontent.com/Allyedge/movies/refs/heads/main/data/movies.json"
       );
-      
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      
       const data = await res.json();
       console.log("Fetched movies:", data.length);
       setAllMovies(data);
@@ -31,6 +30,18 @@ const MovieList = () => {
     fetchMovies();
   }, [fetchMovies]);
 
+ 
+  const gridOptions = useMemo(() => ({
+    rowHeight: 140,
+    animateRows: false,
+    suppressCellFocus: true,
+  
+    rowBuffer: 5, 
+   
+    getRowId: (params) => String(params.data.id),
+  
+  }), []);
+
   return (
     <div className="flex flex-col bg-slate-900 min-h-screen text-slate-100 px-4 pb-8">
       <div className="flex items-center justify-between py-6 mb-2">
@@ -42,7 +53,6 @@ const MovieList = () => {
         </div>
       </div>
 
-      {/* Main content */}
       {loading ? (
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
           <div className="w-8 h-8 rounded-full border-2 border-slate-700 border-t-emerald-500 animate-spin" />
@@ -67,15 +77,8 @@ const MovieList = () => {
           exportFileName={`movies_${new Date().toISOString().split("T")[0]}`}
           searchPlaceholder="Search across all columns..."
           height={700}
-          gridOptions={{
-            rowHeight: 140,
-            animateRows: true,
-            suppressCellFocus: true,
-            getRowId: (params) => String(params.data.id),
-            rowBuffer: 20,
-          }}
+          gridOptions={gridOptions}
         >
-        
           <AGTable.Column
             headerName="#"
             cellRendererType="rowNumber"
@@ -85,34 +88,28 @@ const MovieList = () => {
             pinned="left"
           />
 
-       
           <AGTable.Column
             field="poster"
             header="Poster"
-           
             width={120}
             filter={false}
             sortable={false}
           />
 
-     
           <AGTable.Column
             field="id"
             header="ID"
             width={80}
           />
 
-        
           <AGTable.Column
             field="title"
             header="Title"
             flex={2}
             minWidth={200}
             cellRendererType="text"
-          
           />
 
-        
           <AGTable.Column
             field="release_date"
             header="Release Date"
@@ -120,25 +117,20 @@ const MovieList = () => {
             width={150}
           />
 
-       
           <AGTable.Column
             field="genres"
             header="Genres"
             width={250}
-            cellRendererType="tags"
             cellRendererParams={{ limit: 3 }}
           />
 
-         
           <AGTable.Column
             field="overview"
             header="Overview"
             flex={3}
             minWidth={300}
-            wrapText={true}
-            autoHeight={true}
+           
             cellRendererType="clampedText"
-            cellRendererParams={{ lines: 4 }}
           />
         </AGTable>
       )}
@@ -146,4 +138,4 @@ const MovieList = () => {
   );
 };
 
-export default MovieList;
+export default MovieList2;
