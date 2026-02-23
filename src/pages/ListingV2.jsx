@@ -2,23 +2,23 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Table, { useTableSearches, filterByColumnSearches } from "./TableV2";
 import Input from "./Input";
 
-// ─── One-time data normalisation after fetch ───────────────────────────────
+
 const processMovies = (raw) =>
   raw.map((m) => {
     const d = m.release_date ? new Date(m.release_date * 1000) : null;
     return {
       ...m,
-      releaseDateStr: d ? d.toLocaleDateString("en-CA") : "", // "YYYY-MM-DD"
+      releaseDateStr: d ? d.toLocaleDateString("en-CA") : "",
       genresStr: (m.genres ?? []).join(", "),
     };
   });
 
-// ─── Custom filter fns for pre-processed fields ────────────────────────────
+
 const COLUMN_FILTER_FNS = {
   releaseDateStr: (value, term) => (value ? value.startsWith(term.trim()) : false),
 };
 
-// ─── Virtualisation ────────────────────────────────────────────────────────
+
 const ITEM_SIZE = 130;
 const BUFFER_ITEMS = 15;
 
@@ -36,16 +36,12 @@ const getVirtualWindow = (rows, scrollTop, viewportH) => {
   };
 };
 
-// ─── Reusable cell renderers ───────────────────────────────────────────────
+
 const PosterThumb = ({ movie }) => (
   <div className="flex flex-col items-start gap-1.5">
     <div className="h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
-      <img
-        src={movie.poster}
-        alt={`${movie.title} poster`}
-        loading="lazy"
-        className="h-full w-full object-cover"
-      />
+      <img src={movie.poster} alt={`${movie.title} poster`} loading="lazy"
+        className="h-full w-full object-cover" />
     </div>
     <span className="text-[10px] text-slate-500 font-mono">{movie.id}</span>
   </div>
@@ -53,14 +49,9 @@ const PosterThumb = ({ movie }) => (
 
 const TitleCell = ({ movie }) => (
   <div className="flex items-start gap-3">
-    {/* Poster visible only on mobile (sm hides the dedicated ID column) */}
     <div className="sm:hidden h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
-      <img
-        src={movie.poster}
-        alt={`${movie.title} poster`}
-        loading="lazy"
-        className="h-full w-full object-cover"
-      />
+      <img src={movie.poster} alt={`${movie.title} poster`} loading="lazy"
+        className="h-full w-full object-cover" />
     </div>
     <span className="text-sm font-medium text-white leading-snug">{movie.title}</span>
   </div>
@@ -69,18 +60,15 @@ const TitleCell = ({ movie }) => (
 const GenreTags = ({ genres }) => (
   <div className="flex flex-wrap gap-1">
     {(genres ?? []).map((genre, i) => (
-      <span
-        key={i}
-        className="bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md text-[11px]"
-      >
+      <span key={i}
+        className="bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md text-[11px]">
         {genre}
       </span>
     ))}
   </div>
 );
 
-// ─── Column definitions ────────────────────────────────────────────────────
-// Defined outside the component — stable reference, never recreated on render.
+
 const COLUMNS = [
   {
     header: "#",
@@ -109,11 +97,10 @@ const COLUMNS = [
     width: 170,
     className: "hidden md:table-cell",
     cellClassName: "text-xs font-mono text-slate-400",
-    // default render: reads releaseDateStr via dataKey → no custom render needed
   },
   {
     header: "Genres",
-    dataKey: "genres",          // filter uses the array for defaultMatch
+    dataKey: "genres",
     width: 200,
     className: "hidden lg:table-cell",
     render: (movie) => <GenreTags genres={movie.genres} />,
@@ -125,7 +112,7 @@ const COLUMNS = [
   },
 ];
 
-// ─── Component ─────────────────────────────────────────────────────────────
+
 const MovieListV2 = () => {
   const [allMovies, setAllMovies]         = useState([]);
   const [loading, setLoading]             = useState(false);
@@ -134,12 +121,13 @@ const MovieListV2 = () => {
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [scrollTop, setScrollTop]         = useState(0);
   const [viewportH, setViewportH]         = useState(800);
+  const [showSearch, setShowSearch]       = useState(false); 
 
-  const scrollRef  = useRef(null);
-  const rafRef     = useRef(null);
+  const scrollRef   = useRef(null);
+  const rafRef      = useRef(null);
   const searchState = useTableSearches();
 
-  // ── Viewport measurement ──
+ 
   useEffect(() => {
     const measure = () =>
       setViewportH(scrollRef.current?.clientHeight ?? window.innerHeight * 0.8);
@@ -148,7 +136,7 @@ const MovieListV2 = () => {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // ── Fetch + normalise ──
+ 
   const fetchMovies = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -167,13 +155,13 @@ const MovieListV2 = () => {
 
   useEffect(() => { fetchMovies(); }, [fetchMovies]);
 
-  // ── Derived genre list ──
+ 
   const allGenres = useMemo(
     () => [...new Set(allMovies.flatMap((m) => m.genres ?? []))].sort(),
     [allMovies],
   );
 
-  // ── Filters (global → column) ──
+ 
   const globalFiltered = useMemo(() => {
     let list = allMovies;
     if (selectedGenre !== "all")
@@ -181,9 +169,7 @@ const MovieListV2 = () => {
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
-        (m) =>
-          m.title?.toLowerCase().includes(q) ||
-          m.overview?.toLowerCase().includes(q),
+        (m) => m.title?.toLowerCase().includes(q) || m.overview?.toLowerCase().includes(q),
       );
     }
     return list;
@@ -194,13 +180,13 @@ const MovieListV2 = () => {
     [globalFiltered, searchState.searches],
   );
 
-  // ── Virtual window ──
+
   const { visibleRows, startIdx, offsetY, totalHeight } = useMemo(
     () => getVirtualWindow(columnFiltered, scrollTop, viewportH),
     [columnFiltered, scrollTop, viewportH],
   );
 
-  // ── Scroll handler (rAF-guarded) ──
+
   const handleScroll = useCallback((e) => {
     const top = e.target.scrollTop;
     if (rafRef.current) return;
@@ -210,7 +196,7 @@ const MovieListV2 = () => {
     });
   }, []);
 
-  // ── Toolbar helpers ──
+
   const clearAllFilters = useCallback(() => {
     setSearchTerm("");
     setSelectedGenre("all");
@@ -235,8 +221,8 @@ const MovieListV2 = () => {
     const blob = new Blob(["\uFEFF" + [headers.join(","), ...rows].join("\n")], {
       type: "text/csv;charset=utf-8;",
     });
-    const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement("a"), {
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement("a"), {
       href: url,
       download: `movies_${new Date().toISOString().split("T")[0]}.csv`,
       style: "visibility:hidden",
@@ -300,19 +286,50 @@ const MovieListV2 = () => {
         </div>
       </section>
 
-      {/* Count */}
-      <p className="mb-3 text-xs text-slate-500 font-mono px-1">
-        Showing{" "}
-        <span className="text-emerald-400 font-semibold">{columnFiltered.length}</span>{" "}
-        of <span className="text-slate-300">{allMovies.length}</span> movies
-        {searchState.activeCount > 0 && (
-          <span className="text-amber-400 ml-2">
-            · {searchState.activeCount} column filter{searchState.activeCount > 1 ? "s" : ""} active
-          </span>
-        )}
-      </p>
 
-      {/* Loading / Error / Table */}
+      <div className="mb-3 flex items-center justify-between px-1">
+        <p className="text-xs text-slate-500 font-mono">
+          Showing{" "}
+          <span className="text-emerald-400 font-semibold">{columnFiltered.length}</span>{" "}
+          of <span className="text-slate-300">{allMovies.length}</span> movies
+          {searchState.activeCount > 0 && (
+            <span className="text-amber-400 ml-2">
+              · {searchState.activeCount} column filter{searchState.activeCount > 1 ? "s" : ""} active
+            </span>
+          )}
+        </p>
+
+      
+        <button
+          type="button"
+          onClick={() => setShowSearch((v) => !v)}
+          className={`
+            flex items-center gap-1.5 h-7 px-3 rounded-lg border text-xs font-medium
+            transition-all duration-150
+            ${showSearch
+              ? "border-emerald-600/60 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+              : "border-slate-700 bg-slate-800/60 text-slate-400 hover:border-slate-500 hover:text-slate-300"
+            }
+          `}
+          aria-pressed={showSearch}
+        >
+       
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+          {showSearch ? "Hide search" : "Show search"}
+          
+          {!showSearch && searchState.activeCount > 0 && (
+            <span className="ml-0.5 bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 rounded-full leading-tight">
+              {searchState.activeCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+    
       {loading ? (
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
           <div className="w-8 h-8 rounded-full border-2 border-slate-700 border-t-emerald-500 animate-spin" />
@@ -321,15 +338,12 @@ const MovieListV2 = () => {
       ) : error ? (
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
           <p className="text-red-400 text-sm">{error.message}</p>
-          <button
-            onClick={fetchMovies}
-            className="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm hover:border-slate-500 transition"
-          >
+          <button onClick={fetchMovies}
+            className="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm hover:border-slate-500 transition">
             Retry
           </button>
         </div>
       ) : (
-        /* ── Virtual scroll container ── */
         <div
           ref={scrollRef}
           className="overflow-auto rounded-xl"
@@ -338,18 +352,16 @@ const MovieListV2 = () => {
         >
           <div style={{ height: totalHeight, position: "relative", minHeight: "100%" }}>
             <div style={{ transform: `translateY(${offsetY}px)`, willChange: "transform" }}>
-
-              {/* ✅ Just one line to drop in the table */}
               <Table
                 columns={COLUMNS}
                 rows={visibleRows}
                 startIndex={startIdx}
                 searches={searchState.searches}
                 onSearch={searchState.setSearch}
+                showSearch={showSearch}
                 isEmpty={columnFiltered.length === 0}
                 activeFilterCount={searchState.activeCount}
               />
-
             </div>
           </div>
         </div>

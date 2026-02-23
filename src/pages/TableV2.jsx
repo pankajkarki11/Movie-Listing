@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 
-// ─── Utility exports ──────────────────────────────────────────────────────────
+
 
 export const resolvePath = (obj, path) =>
   path.split(".").reduce((acc, key) => acc?.[key], obj);
@@ -36,22 +36,7 @@ export const useTableSearches = () => {
   return { searches, setSearch, clearSearches, activeCount };
 };
 
-// ─── Column definition shape (for reference / JSDoc) ─────────────────────────
-/**
- * @typedef {Object} ColumnDef
- * @property {string}            header           — Header label text
- * @property {string}            [dataKey]        — Dot-path into row (used for default render + filter)
- * @property {boolean}           [searchable]     — Show search input? default true when dataKey present
- * @property {'text'|'date'}     [searchType]     — Input widget in search row (default "text")
- * @property {Function}          [filterFn]       — Custom (value, term) => bool  (overrides defaultMatch)
- * @property {Function}          [render]         — (row, absoluteRowIndex) => ReactNode
- * @property {string}            [className]      — Applied to BOTH <th> and <td>
- * @property {string}            [headerClassName]— Extra classes on <th> only
- * @property {string}            [cellClassName]  — Extra classes on <td> only
- * @property {number|string}     [width]          — Column width (passed as inline style)
- */
 
-// ─── Internal icons ───────────────────────────────────────────────────────────
 
 const SearchIcon = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
@@ -68,13 +53,12 @@ const ClearIcon = () => (
   </svg>
 );
 
-// ─── Search cell (one per column in the search row) ──────────────────────────
+// ─── Search cell ──────────────────────────────────────────────────────────────
 
 const SearchCell = ({ col, value, onSet }) => {
   const base = `px-3 py-2 ${col.className ?? ""} ${col.headerClassName ?? ""}`;
   const style = { width: col.width ?? "auto" };
 
-  // No search for this column
   if (!col.dataKey || col.searchable === false) {
     return <th className={base} style={style} />;
   }
@@ -110,7 +94,6 @@ const SearchCell = ({ col, value, onSet }) => {
     );
   }
 
-  // Default: text search
   return (
     <th className={`px-3 py-2.5 ${col.className ?? ""} ${col.headerClassName ?? ""}`} style={style}>
       <div className="relative group">
@@ -145,39 +128,29 @@ const SearchCell = ({ col, value, onSet }) => {
   );
 };
 
-// ─── Main <Table /> component ─────────────────────────────────────────────────
-/**
- * Props:
- *   columns          ColumnDef[]           — Column definitions
- *   rows             any[]                 — (visible) rows to render
- *   startIndex       number                — Offset for row numbering in virtual lists (default 0)
- *   searches         Record<string,string> — Current search state (from useTableSearches)
- *   onSearch         (key, val) => void    — Search setter (from useTableSearches)
- *   isEmpty          boolean               — True when the full filtered set is empty
- *   activeFilterCount number              — How many column filters are active
- *   className        string
- */
+
 const Table = ({
   columns = [],
   rows = [],
   startIndex = 0,
   searches = {},
   onSearch = () => {},
+  showSearch = true,
   isEmpty = false,
   activeFilterCount = 0,
   className = "",
 }) => {
-  const hasSearchRow = columns.some(
-    (col) => col.dataKey && col.searchable !== false,
-  );
+
+  const hasSearchRow =
+    showSearch && columns.some((col) => col.dataKey && col.searchable !== false);
 
   return (
     <div className={`overflow-x-auto rounded-xl border border-slate-700/60 shadow-2xl shadow-black/40 ${className}`}>
       <table className="min-w-full divide-y divide-slate-700/60">
 
-        {/* ── HEAD ─────────────────────────────────────────────────────── */}
+     
         <thead>
-          {/* Label row */}
+      
           <tr className="bg-slate-900">
             {columns.map((col, ci) => (
               <th
@@ -194,7 +167,7 @@ const Table = ({
             ))}
           </tr>
 
-          {/* Search row */}
+      
           {hasSearchRow && (
             <tr className="bg-slate-950/80 border-t border-slate-800">
               {columns.map((col, ci) => (
@@ -240,7 +213,6 @@ const Table = ({
             </tr>
           ))}
 
-          {/* Empty states */}
           {isEmpty && activeFilterCount > 0 && (
             <tr>
               <td colSpan={columns.length} className="px-6 py-14 text-center">
