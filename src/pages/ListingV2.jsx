@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import Table, { useTableSearches, filterByColumnSearches } from "./TableV2";
+import Table, { useTableSearches, filterByColumnSearches, useDebounce } from "./TableV2";
 import Input from "./Input";
 
-
+// ─── Data processing ───────────────────────────────────────────────────────
 const processMovies = (raw) =>
   raw.map((m) => {
     const d = m.release_date ? new Date(m.release_date * 1000) : null;
@@ -13,12 +13,11 @@ const processMovies = (raw) =>
     };
   });
 
-
 const COLUMN_FILTER_FNS = {
   releaseDateStr: (value, term) => (value ? value.startsWith(term.trim()) : false),
 };
 
-
+// ─── Virtualisation ────────────────────────────────────────────────────────
 const ITEM_SIZE = 130;
 const BUFFER_ITEMS = 15;
 
@@ -36,7 +35,7 @@ const getVirtualWindow = (rows, scrollTop, viewportH) => {
   };
 };
 
-
+// ─── Cell renderers ────────────────────────────────────────────────────────
 const PosterThumb = ({ movie }) => (
   <div className="flex flex-col items-start gap-1.5">
     <div className="h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
@@ -68,7 +67,7 @@ const GenreTags = ({ genres }) => (
   </div>
 );
 
-
+// ─── Column definitions ────────────────────────────────────────────────────
 const COLUMNS = [
   {
     header: "#",
@@ -112,7 +111,7 @@ const COLUMNS = [
   },
 ];
 
-
+// ─── Component ─────────────────────────────────────────────────────────────
 const MovieListV2 = () => {
   const [allMovies, setAllMovies]         = useState([]);
   const [loading, setLoading]             = useState(false);
@@ -121,13 +120,16 @@ const MovieListV2 = () => {
   const [selectedGenre, setSelectedGenre] = useState("all");
   const [scrollTop, setScrollTop]         = useState(0);
   const [viewportH, setViewportH]         = useState(800);
-  const [showSearch, setShowSearch]       = useState(false); 
+  const [showSearch, setShowSearch]       = useState(false);
 
-  const scrollRef   = useRef(null);
-  const rafRef      = useRef(null);
+  const scrollRef = useRef(null);
+  const rafRef    = useRef(null);
+ 
+  const prevFilteredLengthRef = useRef(null);
+
   const searchState = useTableSearches();
 
- 
+
   useEffect(() => {
     const measure = () =>
       setViewportH(scrollRef.current?.clientHeight ?? window.innerHeight * 0.8);
@@ -136,7 +138,7 @@ const MovieListV2 = () => {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
- 
+  // ── Fetch ──
   const fetchMovies = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -155,38 +157,62 @@ const MovieListV2 = () => {
 
   useEffect(() => { fetchMovies(); }, [fetchMovies]);
 
- 
+  // ── Debounce global search — input stays instant, filter fires after pause ──
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
+  // ── Genre list ──
   const allGenres = useMemo(
     () => [...new Set(allMovies.flatMap((m) => m.genres ?? []))].sort(),
     [allMovies],
   );
 
- 
+  // ── Filters ──
   const globalFiltered = useMemo(() => {
     let list = allMovies;
     if (selectedGenre !== "all")
       list = list.filter((m) => m.genres?.includes(selectedGenre));
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
+    if (debouncedSearchTerm.trim()) {
+      const q = debouncedSearchTerm.toLowerCase();
       list = list.filter(
         (m) => m.title?.toLowerCase().includes(q) || m.overview?.toLowerCase().includes(q),
       );
     }
     return list;
-  }, [allMovies, selectedGenre, searchTerm]);
+  }, [allMovies, selectedGenre, debouncedSearchTerm]);
 
   const columnFiltered = useMemo(
     () => filterByColumnSearches(globalFiltered, searchState.searches, COLUMN_FILTER_FNS),
     [globalFiltered, searchState.searches],
   );
+  useEffect(() => {
+    const newLength = columnFiltered.length;
+    const prevLength = prevFilteredLengthRef.current;
+    if (prevLength === null) {
+      prevFilteredLengthRef.current = newLength;
+      return;
+    }
+
+    
+    if (newLength !== prevLength) {
+      prevFilteredLengthRef.current = newLength;
+
+   
+      setScrollTop(0);
 
 
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = 0;
+      }
+    }
+  }, [columnFiltered]);
+
+  // ── Virtual window ──
   const { visibleRows, startIdx, offsetY, totalHeight } = useMemo(
     () => getVirtualWindow(columnFiltered, scrollTop, viewportH),
     [columnFiltered, scrollTop, viewportH],
   );
 
-
+  // ── Scroll handler ──
   const handleScroll = useCallback((e) => {
     const top = e.target.scrollTop;
     if (rafRef.current) return;
@@ -197,11 +223,12 @@ const MovieListV2 = () => {
   }, []);
 
 
+  const { clearSearches } = searchState;
   const clearAllFilters = useCallback(() => {
     setSearchTerm("");
     setSelectedGenre("all");
-    searchState.clearSearches();
-  }, [searchState]);
+    clearSearches();
+  }, [clearSearches]);
 
   const hasAnyFilter = searchTerm || selectedGenre !== "all" || searchState.activeCount > 0;
 
@@ -233,16 +260,16 @@ const MovieListV2 = () => {
     URL.revokeObjectURL(url);
   }, [columnFiltered]);
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col bg-slate-900 min-h-screen text-slate-100 px-4 pb-8">
 
-      {/* Header */}
+   
       <div className="flex items-center justify-between py-6 mb-2">
         <h1 className="text-2xl font-bold tracking-tight text-white">🎬 Movie Listing</h1>
       </div>
 
-      {/* Filter bar */}
+   
       <section className="mb-6 grid gap-3 rounded-2xl border border-slate-700 bg-slate-800 p-4 sm:grid-cols-[1fr_200px_auto]">
         <Input
           label="Global Search"
@@ -267,26 +294,21 @@ const MovieListV2 = () => {
         </label>
 
         <div className="flex items-end gap-2">
-          <button
-            type="button"
-            onClick={clearAllFilters}
-            disabled={!hasAnyFilter}
-            className="h-8 rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-sm text-slate-300 transition hover:border-slate-500 disabled:opacity-30 disabled:cursor-not-allowed"
-          >
+          <button type="button" onClick={clearAllFilters} disabled={!hasAnyFilter}
+            className="h-8 rounded-xl border border-slate-700 bg-slate-950/70 px-4 text-sm
+              text-slate-300 transition hover:border-slate-500 disabled:opacity-30 disabled:cursor-not-allowed">
             Reset all
           </button>
-          <button
-            type="button"
-            onClick={exportToCSV}
-            disabled={!columnFiltered.length}
-            className="h-8 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 whitespace-nowrap"
-          >
+          <button type="button" onClick={exportToCSV} disabled={!columnFiltered.length}
+            className="h-8 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950
+              transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700
+              disabled:text-slate-400 whitespace-nowrap">
             📥 Export CSV ({columnFiltered.length})
           </button>
         </div>
       </section>
 
-
+  
       <div className="mb-3 flex items-center justify-between px-1">
         <p className="text-xs text-slate-500 font-mono">
           Showing{" "}
@@ -299,28 +321,18 @@ const MovieListV2 = () => {
           )}
         </p>
 
-      
-        <button
-          type="button"
-          onClick={() => setShowSearch((v) => !v)}
-          className={`
-            flex items-center gap-1.5 h-7 px-3 rounded-lg border text-xs font-medium
+        <button type="button" onClick={() => setShowSearch((v) => !v)} aria-pressed={showSearch}
+          className={`flex items-center gap-1.5 h-7 px-3 rounded-lg border text-xs font-medium
             transition-all duration-150
             ${showSearch
               ? "border-emerald-600/60 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
               : "border-slate-700 bg-slate-800/60 text-slate-400 hover:border-slate-500 hover:text-slate-300"
-            }
-          `}
-          aria-pressed={showSearch}
-        >
-       
+            }`}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.35-4.35" />
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
           {showSearch ? "Hide search" : "Show search"}
-          
           {!showSearch && searchState.activeCount > 0 && (
             <span className="ml-0.5 bg-amber-500 text-slate-950 text-[10px] font-bold px-1.5 rounded-full leading-tight">
               {searchState.activeCount}

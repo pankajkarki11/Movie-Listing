@@ -1,7 +1,5 @@
-import { useState, useCallback } from "react";
-
-
-
+import { useState, useCallback, useEffect, useRef } from "react";
+import { Search, X } from "lucide-react";
 export const resolvePath = (obj, path) =>
   path.split(".").reduce((acc, key) => acc?.[key], obj);
 
@@ -21,10 +19,9 @@ export const filterByColumnSearches = (rows, searches, filterFns = {}) => {
       const value = resolvePath(row, dataKey);
       const fn = filterFns[dataKey] ?? defaultMatch;
       return fn(value, term);
-    })
+    }),
   );
 };
-
 export const useTableSearches = () => {
   const [searches, setSearches] = useState({});
   const setSearch = useCallback(
@@ -36,41 +33,62 @@ export const useTableSearches = () => {
   return { searches, setSearch, clearSearches, activeCount };
 };
 
+export const useDebounce = (value, delay = 300) => {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+
+  return debounced;
+};
 
 
-const SearchIcon = () => (
-  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" />
-    <path d="m21 21-4.35-4.35" />
-  </svg>
-);
-
-const ClearIcon = () => (
-  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-    stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
-
-// ─── Search cell ──────────────────────────────────────────────────────────────
-
-const SearchCell = ({ col, value, onSet }) => {
+const SearchCell = ({ col, value: parentValue, onSet, debounceDelay = 300 }) => {
   const base = `px-3 py-2 ${col.className ?? ""} ${col.headerClassName ?? ""}`;
   const style = { width: col.width ?? "auto" };
+
+
+  const [localValue, setLocalValue] = useState(parentValue);
+
+  useEffect(() => {
+    setLocalValue(parentValue);
+  }, [parentValue]);
+
+  const debouncedValue = useDebounce(localValue, debounceDelay);
+
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    onSet(col.dataKey, debouncedValue);
+  }, [debouncedValue]);
+  const handleClear = useCallback(() => {
+    setLocalValue("");
+    onSet(col.dataKey, "");
+  }, [col.dataKey, onSet]);
+
 
   if (!col.dataKey || col.searchable === false) {
     return <th className={base} style={style} />;
   }
 
+
   if (col.searchType === "date") {
     return (
-      <th className={`px-3 py-2.5 ${col.className ?? ""} ${col.headerClassName ?? ""}`} style={style}>
+      <th
+        className={`px-3 py-2.5 ${col.className ?? ""} ${col.headerClassName ?? ""}`}
+        style={style}
+      >
         <div className="flex items-center gap-1.5">
           <input
             type="date"
-            value={value}
+            value={parentValue}                      
             onChange={(e) => onSet(col.dataKey, e.target.value)}
+            aria-label={`Filter by ${col.header}`}
             className="
               w-full px-2 py-1.5 text-xs font-mono rounded-lg
               bg-slate-800/80 border border-slate-700 text-slate-100
@@ -79,14 +97,14 @@ const SearchCell = ({ col, value, onSet }) => {
               hover:border-slate-600 [color-scheme:dark]
             "
           />
-          {value && (
+          {parentValue && (
             <button
               type="button"
               onClick={() => onSet(col.dataKey, "")}
               className="flex-shrink-0 text-slate-500 hover:text-emerald-400 transition-colors"
-              aria-label="Clear date filter"
+              aria-label={`Clear ${col.header} filter`}
             >
-              <ClearIcon />
+              <X className="h-3 w-3" />
             </button>
           )}
         </div>
@@ -94,17 +112,23 @@ const SearchCell = ({ col, value, onSet }) => {
     );
   }
 
+ 
   return (
-    <th className={`px-3 py-2.5 ${col.className ?? ""} ${col.headerClassName ?? ""}`} style={style}>
+    <th
+      className={`px-3 py-2.5 ${col.className ?? ""} ${col.headerClassName ?? ""}`}
+      style={style}
+    >
       <div className="relative group">
-        <span className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none text-slate-600 group-focus-within:text-emerald-500 transition-colors duration-150">
-          <SearchIcon />
+        <span className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none
+          text-slate-600 group-focus-within:text-emerald-500 transition-colors duration-150">
+          <Search className="w-3 h-3" />
         </span>
         <input
           type="text"
-          value={value}
-          onChange={(e) => onSet(col.dataKey, e.target.value)}
-          placeholder="Search..."
+          value={localValue}                      
+          onChange={(e) => setLocalValue(e.target.value)}
+          placeholder={col.searchPlaceholder ?? "Search…"}
+          aria-label={`Filter by ${col.header}`}
           className="
             w-full pl-7 pr-7 py-1.5 text-xs font-mono rounded-lg
             bg-slate-800/80 border text-slate-100 placeholder-slate-600
@@ -113,20 +137,22 @@ const SearchCell = ({ col, value, onSet }) => {
             hover:border-slate-600
           "
         />
-        {value && (
+        {localValue && (
           <button
             type="button"
-            onClick={() => onSet(col.dataKey, "")}
-            className="absolute inset-y-0 right-2 flex items-center text-slate-500 hover:text-emerald-400 transition-colors duration-100"
-            aria-label={`Clear ${col.dataKey} filter`}
+            onClick={handleClear}
+            className="absolute inset-y-0 right-2 flex items-center
+              text-slate-500 hover:text-emerald-400 transition-colors duration-100"
+            aria-label={`Clear ${col.header} filter`}
           >
-            <ClearIcon />
+            <X className="h-3 w-3" />
           </button>
         )}
       </div>
     </th>
   );
 };
+
 
 
 const Table = ({
@@ -138,19 +164,20 @@ const Table = ({
   showSearch = true,
   isEmpty = false,
   activeFilterCount = 0,
+  searchDebounceMs = 300,
   className = "",
 }) => {
-
   const hasSearchRow =
     showSearch && columns.some((col) => col.dataKey && col.searchable !== false);
 
   return (
-    <div className={`overflow-x-auto rounded-xl border border-slate-700/60 shadow-2xl shadow-black/40 ${className}`}>
+    <div
+      className={`overflow-x-auto rounded-xl border border-slate-700/60 shadow-2xl shadow-black/40 ${className}`}
+    >
       <table className="min-w-full divide-y divide-slate-700/60">
 
-     
+    
         <thead>
-      
           <tr className="bg-slate-900">
             {columns.map((col, ci) => (
               <th
@@ -167,7 +194,6 @@ const Table = ({
             ))}
           </tr>
 
-      
           {hasSearchRow && (
             <tr className="bg-slate-950/80 border-t border-slate-800">
               {columns.map((col, ci) => (
@@ -176,13 +202,14 @@ const Table = ({
                   col={col}
                   value={col.dataKey ? (searches[col.dataKey] ?? "") : ""}
                   onSet={onSearch}
+                  debounceDelay={searchDebounceMs}
                 />
               ))}
             </tr>
           )}
         </thead>
 
-        {/* ── BODY ─────────────────────────────────────────────────────── */}
+
         <tbody className="divide-y divide-slate-800/70">
           {rows.map((row, ri) => (
             <tr
