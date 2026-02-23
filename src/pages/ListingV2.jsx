@@ -1,46 +1,154 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import Table2, { useTableSearches, filterByColumnSearches } from "./TableV2";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import Table, { useTableSearches, filterByColumnSearches } from "./TableV2";
 import Input from "./Input";
 
+// ─── One-time data normalisation after fetch ───────────────────────────────
+const processMovies = (raw) =>
+  raw.map((m) => {
+    const d = m.release_date ? new Date(m.release_date * 1000) : null;
+    return {
+      ...m,
+      releaseDateStr: d ? d.toLocaleDateString("en-CA") : "", // "YYYY-MM-DD"
+      genresStr: (m.genres ?? []).join(", "),
+    };
+  });
+
+// ─── Custom filter fns for pre-processed fields ────────────────────────────
 const COLUMN_FILTER_FNS = {
-  release_date: (value, term) => {
-    if (!value) return false;
-    const formatted = new Date(value * 1000).toLocaleDateString("en-CA");
-    return formatted.startsWith(term.trim());
-  },
+  releaseDateStr: (value, term) => (value ? value.startsWith(term.trim()) : false),
 };
 
+// ─── Virtualisation ────────────────────────────────────────────────────────
 const ITEM_SIZE = 130;
 const BUFFER_ITEMS = 15;
 
-const getVirtualWindow = (rows, scrollTop) => {
-  const viewportH =
-    typeof window !== "undefined" ? window.innerHeight * 0.8 : 800;
-  const startIdx = Math.max(
-    0,
-    Math.floor(scrollTop / ITEM_SIZE) - BUFFER_ITEMS,
-  );
+const getVirtualWindow = (rows, scrollTop, viewportH) => {
+  const startIdx = Math.max(0, Math.floor(scrollTop / ITEM_SIZE) - BUFFER_ITEMS);
   const endIdx = Math.min(
     rows.length,
     startIdx + Math.ceil(viewportH / ITEM_SIZE) + BUFFER_ITEMS * 2,
   );
   return {
     visibleRows: rows.slice(startIdx, endIdx),
+    startIdx,
     offsetY: startIdx * ITEM_SIZE,
     totalHeight: rows.length * ITEM_SIZE,
   };
 };
 
-const MovieListV2 = () => {
-  const [allMovies, setAllMovies] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedGenre, setSelectedGenre] = useState("all");
-  const [scrollTop, setScrollTop] = useState(0);
+// ─── Reusable cell renderers ───────────────────────────────────────────────
+const PosterThumb = ({ movie }) => (
+  <div className="flex flex-col items-start gap-1.5">
+    <div className="h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
+      <img
+        src={movie.poster}
+        alt={`${movie.title} poster`}
+        loading="lazy"
+        className="h-full w-full object-cover"
+      />
+    </div>
+    <span className="text-[10px] text-slate-500 font-mono">{movie.id}</span>
+  </div>
+);
 
+const TitleCell = ({ movie }) => (
+  <div className="flex items-start gap-3">
+    {/* Poster visible only on mobile (sm hides the dedicated ID column) */}
+    <div className="sm:hidden h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
+      <img
+        src={movie.poster}
+        alt={`${movie.title} poster`}
+        loading="lazy"
+        className="h-full w-full object-cover"
+      />
+    </div>
+    <span className="text-sm font-medium text-white leading-snug">{movie.title}</span>
+  </div>
+);
+
+const GenreTags = ({ genres }) => (
+  <div className="flex flex-wrap gap-1">
+    {(genres ?? []).map((genre, i) => (
+      <span
+        key={i}
+        className="bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md text-[11px]"
+      >
+        {genre}
+      </span>
+    ))}
+  </div>
+);
+
+// ─── Column definitions ────────────────────────────────────────────────────
+// Defined outside the component — stable reference, never recreated on render.
+const COLUMNS = [
+  {
+    header: "#",
+    width: 50,
+    searchable: false,
+    className: "hidden sm:table-cell",
+    cellClassName: "text-slate-500 text-xs tabular-nums",
+    render: (_row, absIdx) => absIdx + 1,
+  },
+  {
+    header: "ID",
+    dataKey: "id",
+    width: 100,
+    className: "hidden sm:table-cell",
+    render: (movie) => <PosterThumb movie={movie} />,
+  },
+  {
+    header: "Title",
+    dataKey: "title",
+    render: (movie) => <TitleCell movie={movie} />,
+  },
+  {
+    header: "Release Date",
+    dataKey: "releaseDateStr",
+    searchType: "date",
+    width: 170,
+    className: "hidden md:table-cell",
+    cellClassName: "text-xs font-mono text-slate-400",
+    // default render: reads releaseDateStr via dataKey → no custom render needed
+  },
+  {
+    header: "Genres",
+    dataKey: "genres",          // filter uses the array for defaultMatch
+    width: 200,
+    className: "hidden lg:table-cell",
+    render: (movie) => <GenreTags genres={movie.genres} />,
+  },
+  {
+    header: "Overview",
+    dataKey: "overview",
+    cellClassName: "text-xs text-slate-400 leading-relaxed",
+  },
+];
+
+// ─── Component ─────────────────────────────────────────────────────────────
+const MovieListV2 = () => {
+  const [allMovies, setAllMovies]         = useState([]);
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState(null);
+  const [searchTerm, setSearchTerm]       = useState("");
+  const [selectedGenre, setSelectedGenre] = useState("all");
+  const [scrollTop, setScrollTop]         = useState(0);
+  const [viewportH, setViewportH]         = useState(800);
+
+  const scrollRef  = useRef(null);
+  const rafRef     = useRef(null);
   const searchState = useTableSearches();
 
+  // ── Viewport measurement ──
+  useEffect(() => {
+    const measure = () =>
+      setViewportH(scrollRef.current?.clientHeight ?? window.innerHeight * 0.8);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // ── Fetch + normalise ──
   const fetchMovies = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -49,8 +157,7 @@ const MovieListV2 = () => {
         "https://raw.githubusercontent.com/Allyedge/movies/refs/heads/main/data/movies.json",
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const data = await res.json();
-      setAllMovies(data);
+      setAllMovies(processMovies(await res.json()));
     } catch (err) {
       setError(err);
     } finally {
@@ -58,22 +165,19 @@ const MovieListV2 = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetchMovies();
-  }, [fetchMovies]);
+  useEffect(() => { fetchMovies(); }, [fetchMovies]);
 
+  // ── Derived genre list ──
   const allGenres = useMemo(
     () => [...new Set(allMovies.flatMap((m) => m.genres ?? []))].sort(),
     [allMovies],
   );
 
+  // ── Filters (global → column) ──
   const globalFiltered = useMemo(() => {
     let list = allMovies;
-
-    if (selectedGenre !== "all") {
+    if (selectedGenre !== "all")
       list = list.filter((m) => m.genres?.includes(selectedGenre));
-    }
-
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       list = list.filter(
@@ -82,74 +186,57 @@ const MovieListV2 = () => {
           m.overview?.toLowerCase().includes(q),
       );
     }
-
     return list;
   }, [allMovies, selectedGenre, searchTerm]);
 
   const columnFiltered = useMemo(
-    () =>
-      filterByColumnSearches(
-        globalFiltered,
-        searchState.searches,
-        COLUMN_FILTER_FNS,
-      ),
+    () => filterByColumnSearches(globalFiltered, searchState.searches, COLUMN_FILTER_FNS),
     [globalFiltered, searchState.searches],
   );
 
-  const { visibleRows, offsetY, totalHeight } = useMemo(
-    () => getVirtualWindow(columnFiltered, scrollTop),
-    [columnFiltered, scrollTop],
+  // ── Virtual window ──
+  const { visibleRows, startIdx, offsetY, totalHeight } = useMemo(
+    () => getVirtualWindow(columnFiltered, scrollTop, viewportH),
+    [columnFiltered, scrollTop, viewportH],
   );
 
+  // ── Scroll handler (rAF-guarded) ──
   const handleScroll = useCallback((e) => {
     const top = e.target.scrollTop;
-    requestAnimationFrame(() => setScrollTop(top));
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      setScrollTop(top);
+      rafRef.current = null;
+    });
   }, []);
 
-  const clearAllFilters = () => {
+  // ── Toolbar helpers ──
+  const clearAllFilters = useCallback(() => {
     setSearchTerm("");
     setSelectedGenre("all");
     searchState.clearSearches();
-  };
+  }, [searchState]);
 
-  const hasAnyFilter =
-    searchTerm || selectedGenre !== "all" || searchState.activeCount > 0;
+  const hasAnyFilter = searchTerm || selectedGenre !== "all" || searchState.activeCount > 0;
 
   const exportToCSV = useCallback(() => {
-    if (columnFiltered.length === 0) return;
-
-    const escape = (v) => {
-      if (v === null || v === undefined) return "";
+    if (!columnFiltered.length) return;
+    const esc = (v) => {
+      if (v == null) return "";
       const s = String(v);
       return s.includes(",") || s.includes('"') || s.includes("\n")
         ? `"${s.replace(/"/g, '""')}"`
         : s;
     };
-
-    const headers = [
-      "ID",
-      "Title",
-      "Release Date",
-      "Genres",
-      "Overview",
-      "Poster URL",
-    ];
+    const headers = ["ID", "Title", "Release Date", "Genres", "Overview", "Poster URL"];
     const rows = columnFiltered.map((m) =>
-      [
-        m.id,
-        escape(m.title),
-        `"${new Date(m.release_date * 1000).toLocaleDateString("en-CA")}"`,
-        escape((m.genres ?? []).join("; ")),
-        escape(m.overview),
-        escape(m.poster),
-      ].join(","),
+      [m.id, esc(m.title), `"${m.releaseDateStr}"`, esc(m.genresStr), esc(m.overview), esc(m.poster)].join(","),
     );
-
-    const BOM = "\uFEFF";
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([BOM + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = Object.assign(document.createElement("a"), {
+    const blob = new Blob(["\uFEFF" + [headers.join(","), ...rows].join("\n")], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement("a"), {
       href: url,
       download: `movies_${new Date().toISOString().split("T")[0]}.csv`,
       style: "visibility:hidden",
@@ -160,14 +247,16 @@ const MovieListV2 = () => {
     URL.revokeObjectURL(url);
   }, [columnFiltered]);
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col bg-slate-900 min-h-screen text-slate-100 px-4 pb-8">
+
+      {/* Header */}
       <div className="flex items-center justify-between py-6 mb-2">
-        <h1 className="text-2xl font-bold tracking-tight text-white">
-          🎬 Movie Listing
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white">🎬 Movie Listing</h1>
       </div>
 
+      {/* Filter bar */}
       <section className="mb-6 grid gap-3 rounded-2xl border border-slate-700 bg-slate-800 p-4 sm:grid-cols-[1fr_200px_auto]">
         <Input
           label="Global Search"
@@ -187,11 +276,7 @@ const MovieListV2 = () => {
             onChange={(e) => setSelectedGenre(e.target.value)}
           >
             <option value="all">All Genres</option>
-            {allGenres.map((genre) => (
-              <option key={genre} value={genre}>
-                {genre}
-              </option>
-            ))}
+            {allGenres.map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
         </label>
 
@@ -207,7 +292,7 @@ const MovieListV2 = () => {
           <button
             type="button"
             onClick={exportToCSV}
-            disabled={columnFiltered.length === 0}
+            disabled={!columnFiltered.length}
             className="h-8 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400 whitespace-nowrap"
           >
             📥 Export CSV ({columnFiltered.length})
@@ -215,20 +300,19 @@ const MovieListV2 = () => {
         </div>
       </section>
 
+      {/* Count */}
       <p className="mb-3 text-xs text-slate-500 font-mono px-1">
         Showing{" "}
-        <span className="text-emerald-400 font-semibold">
-          {columnFiltered.length}
-        </span>{" "}
+        <span className="text-emerald-400 font-semibold">{columnFiltered.length}</span>{" "}
         of <span className="text-slate-300">{allMovies.length}</span> movies
         {searchState.activeCount > 0 && (
           <span className="text-amber-400 ml-2">
-            · {searchState.activeCount} column filter
-            {searchState.activeCount > 1 ? "s" : ""} active
+            · {searchState.activeCount} column filter{searchState.activeCount > 1 ? "s" : ""} active
           </span>
         )}
       </p>
 
+      {/* Loading / Error / Table */}
       {loading ? (
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
           <div className="w-8 h-8 rounded-full border-2 border-slate-700 border-t-emerald-500 animate-spin" />
@@ -245,143 +329,27 @@ const MovieListV2 = () => {
           </button>
         </div>
       ) : (
+        /* ── Virtual scroll container ── */
         <div
+          ref={scrollRef}
           className="overflow-auto rounded-xl"
           style={{ height: "80vh", overscrollBehavior: "contain" }}
           onScroll={handleScroll}
         >
-          <div
-            style={{
-              height: totalHeight,
-              position: "relative",
-              minHeight: "100%",
-            }}
-          >
-            <div
-              style={{
-                transform: `translateY(${offsetY}px)`,
-                willChange: "transform",
-              }}
-            >
-              <Table2 searchState={searchState}>
-                <Table2.Header>
-                  <Table2.HeaderCell className="hidden sm:table-cell" width={60}>
-                    #
-                  </Table2.HeaderCell>
+          <div style={{ height: totalHeight, position: "relative", minHeight: "100%" }}>
+            <div style={{ transform: `translateY(${offsetY}px)`, willChange: "transform" }}>
 
-                  <Table2.HeaderCell
-                    className="hidden sm:table-cell"
-                    width={100}
-                  >
-                    ID
-                  </Table2.HeaderCell>
+              {/* ✅ Just one line to drop in the table */}
+              <Table
+                columns={COLUMNS}
+                rows={visibleRows}
+                startIndex={startIdx}
+                searches={searchState.searches}
+                onSearch={searchState.setSearch}
+                isEmpty={columnFiltered.length === 0}
+                activeFilterCount={searchState.activeCount}
+              />
 
-                  <Table2.HeaderCell>
-                    Title
-                  </Table2.HeaderCell>
-
-                  <Table2.HeaderCell
-                    className="hidden md:table-cell"
-                    width={160}
-                  >
-                    Release Date
-                  </Table2.HeaderCell>
-
-                  <Table2.HeaderCell
-                    className="hidden lg:table-cell"
-                    width={200}
-                  >
-                    Genres
-                  </Table2.HeaderCell>
-
-                  <Table2.HeaderCell>
-                    Overview
-                  </Table2.HeaderCell>
-                 
-                </Table2.Header>
-
-                <Table2.Body
-                  isEmpty={columnFiltered.length === 0}
-                  activeFilterCount={searchState.activeCount}
-                >
-                  {visibleRows.map((movie) => {
-                    const index = columnFiltered.findIndex(
-                      (m) => m.id === movie.id,
-                    );
-                  
-
-                    return (
-                      <Table2.Row key={movie.id}>
-                        {/* # - not searchable (no dataKey) */}
-                        <Table2.Cell className="hidden sm:table-cell text-slate-500 text-xs tabular-nums">
-                          {index + 1}
-                        </Table2.Cell>
-
-                       
-                        <Table2.Cell className="hidden sm:table-cell" dataKey="id">
-                          <div className="flex flex-col items-start gap-1.5">
-                            <div className="h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
-                              <img
-                                src={movie.poster}
-                                alt={`${movie.title} poster`}
-                                loading="lazy"
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                              {movie.id}
-                            </span>
-                          </div>
-                        </Table2.Cell>
-
-                       
-                        <Table2.Cell dataKey="title">
-                          <div className="flex items-start gap-3">
-                            <div className="sm:hidden h-16 w-12 overflow-hidden rounded-md bg-slate-800 flex-shrink-0">
-                              <img
-                                src={movie.poster}
-                                alt={`${movie.title} poster`}
-                                loading="lazy"
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            <span className="text-sm font-medium text-white leading-snug">
-                              {movie.title}
-                            </span>
-                          </div>
-                        </Table2.Cell>
-
-                      
-                        <Table2.Cell className="hidden md:table-cell text-xs font-mono text-slate-400" dataKey="release_date">
-                          {new Date(
-                            movie.release_date * 1000,
-                          ).toLocaleDateString("en-CA")}
-                        </Table2.Cell>
-
-               
-                        <Table2.Cell className="hidden lg:table-cell" dataKey="genres">
-                          <div className="flex flex-wrap gap-1">
-                            {(movie.genres ?? []).map((genre, i) => (
-                              <span
-                                key={i}
-                                className="bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-md text-[11px]"
-                              >
-                                {genre}
-                              </span>
-                            ))}
-                          </div>
-                        </Table2.Cell>
-
-              
-                        <Table2.Cell className="text-xs text-slate-400 leading-relaxed" dataKey="overview">
-                          {movie.overview}
-                        </Table2.Cell>
-                       
-                      </Table2.Row>
-                    );
-                  })}
-                </Table2.Body>
-              </Table2>
             </div>
           </div>
         </div>

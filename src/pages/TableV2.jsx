@@ -1,18 +1,6 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  Children,
-  isValidElement,
-} from "react";
+import { useState, useCallback } from "react";
 
-const TableContext = createContext({
-  searches: {},
-  setSearch: () => {},
-  columnDataKeys: [],
-  registerColumnDataKey: () => {},
-});
+// ─── Utility exports ──────────────────────────────────────────────────────────
 
 export const resolvePath = (obj, path) =>
   path.split(".").reduce((acc, key) => acc?.[key], obj);
@@ -39,245 +27,247 @@ export const filterByColumnSearches = (rows, searches, filterFns = {}) => {
 
 export const useTableSearches = () => {
   const [searches, setSearches] = useState({});
-
-  const setSearch = (dataKey, value) =>
-    setSearches((prev) => ({ ...prev, [dataKey]: value }));
-
-  const clearSearches = () => setSearches({});
-
+  const setSearch = useCallback(
+    (dataKey, value) => setSearches((prev) => ({ ...prev, [dataKey]: value })),
+    [],
+  );
+  const clearSearches = useCallback(() => setSearches({}), []);
   const activeCount = Object.values(searches).filter((v) => v.trim()).length;
-
   return { searches, setSearch, clearSearches, activeCount };
 };
 
-const Table2 = ({ children, className = "", searchState, onSearchChange, ...props }) => {
-  const [internalSearches, setInternalSearches] = useState({});
-  const [columnDataKeys, setColumnDataKeys] = useState([]);
+// ─── Column definition shape (for reference / JSDoc) ─────────────────────────
+/**
+ * @typedef {Object} ColumnDef
+ * @property {string}            header           — Header label text
+ * @property {string}            [dataKey]        — Dot-path into row (used for default render + filter)
+ * @property {boolean}           [searchable]     — Show search input? default true when dataKey present
+ * @property {'text'|'date'}     [searchType]     — Input widget in search row (default "text")
+ * @property {Function}          [filterFn]       — Custom (value, term) => bool  (overrides defaultMatch)
+ * @property {Function}          [render]         — (row, absoluteRowIndex) => ReactNode
+ * @property {string}            [className]      — Applied to BOTH <th> and <td>
+ * @property {string}            [headerClassName]— Extra classes on <th> only
+ * @property {string}            [cellClassName]  — Extra classes on <td> only
+ * @property {number|string}     [width]          — Column width (passed as inline style)
+ */
 
-  const searches = searchState?.searches ?? internalSearches;
-  const setSearch = searchState?.setSearch ??
-    ((key, val) => setInternalSearches((prev) => ({ ...prev, [key]: val })));
+// ─── Internal icons ───────────────────────────────────────────────────────────
 
-  const registerColumnDataKey = (dataKey, index) => {
-    setColumnDataKeys((prev) => {
-      const newKeys = [...prev];
-      newKeys[index] = dataKey;
-      return newKeys;
-    });
-  };
+const SearchIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.35-4.35" />
+  </svg>
+);
 
-  useEffect(() => {
-    onSearchChange?.(searches);
-  }, [searches, onSearchChange]);
+const ClearIcon = () => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
 
+// ─── Search cell (one per column in the search row) ──────────────────────────
+
+const SearchCell = ({ col, value, onSet }) => {
+  const base = `px-3 py-2 ${col.className ?? ""} ${col.headerClassName ?? ""}`;
+  const style = { width: col.width ?? "auto" };
+
+  // No search for this column
+  if (!col.dataKey || col.searchable === false) {
+    return <th className={base} style={style} />;
+  }
+
+  if (col.searchType === "date") {
+    return (
+      <th className={`px-3 py-2.5 ${col.className ?? ""} ${col.headerClassName ?? ""}`} style={style}>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="date"
+            value={value}
+            onChange={(e) => onSet(col.dataKey, e.target.value)}
+            className="
+              w-full px-2 py-1.5 text-xs font-mono rounded-lg
+              bg-slate-800/80 border border-slate-700 text-slate-100
+              outline-none transition-all duration-150
+              focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20
+              hover:border-slate-600 [color-scheme:dark]
+            "
+          />
+          {value && (
+            <button
+              type="button"
+              onClick={() => onSet(col.dataKey, "")}
+              className="flex-shrink-0 text-slate-500 hover:text-emerald-400 transition-colors"
+              aria-label="Clear date filter"
+            >
+              <ClearIcon />
+            </button>
+          )}
+        </div>
+      </th>
+    );
+  }
+
+  // Default: text search
   return (
-    <TableContext.Provider value={{ 
-      searches, 
-      setSearch, 
-      columnDataKeys, 
-      registerColumnDataKey 
-    }}>
-      <div
-        className={`overflow-x-auto rounded-xl border border-slate-700/60 shadow-2xl shadow-black/40 ${className}`}
-      >
-        <table className="min-w-full divide-y divide-slate-700/60" {...props}>
-          {children}
-        </table>
-      </div>
-    </TableContext.Provider>
-  );
-};
-
-Table2.Header = ({ children, className = "" }) => {
-  const { searches, setSearch, columnDataKeys } = useContext(TableContext);
-
-  const hasSearchableColumns = columnDataKeys.some(key => key);
-                                                  
-  return (
-    <thead>
-      <tr className={`bg-slate-900 ${className}`}>{children}</tr>
-
-      {hasSearchableColumns && (
-        <tr className="bg-slate-950/80 border-t border-slate-800">
-          {Children.map(children, (child, index) => {
-            if (!isValidElement(child)) return null;
-            
-            const { disabledSearch, className: cellClass = "", width } = child.props;
-            const dataKey = columnDataKeys[index];
-
-            if (disabledSearch || !dataKey) {
-              return (
-                <th
-                  key={`search-${index}`}
-                  className={`px-3 py-2 ${cellClass}`}
-                  style={{ width: width || "auto" }}
-                />
-              );
-            }
-
-            return (
-              <th
-                key={`search-${index}`}
-                className={`px-3 py-2.5 ${cellClass}`}
-                style={{ width: width || "auto" }}
-              >
-                <div className="relative group">
-                  <span className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none text-slate-600 group-focus-within:text-emerald-500 transition-colors duration-150">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" />
-                      <path d="m21 21-4.35-4.35" />
-                    </svg>
-                  </span>
-
-                  <input
-                    type="text"
-                    value={searches[dataKey] || ""}
-                    onChange={(e) => setSearch(dataKey, e.target.value)}
-                    placeholder="Search..."
-                    className="
-                      w-full pl-7 pr-7 py-1.5 text-xs font-mono rounded-lg
-                      bg-slate-800/80 border text-slate-100 placeholder-slate-600
-                      outline-none transition-all duration-150 border-slate-700
-                      focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20
-                      hover:border-slate-600
-                    "
-                  />
-
-                  {searches[dataKey] && (
-                    <button
-                      type="button"
-                      onClick={() => setSearch(dataKey, "")}
-                      className="absolute inset-y-0 right-2 flex items-center text-slate-500 hover:text-emerald-400 transition-colors duration-100"
-                      aria-label={`Clear ${dataKey} filter`}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                        <path d="M18 6 6 18M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </th>
-            );
-          })}
-        </tr>
-      )}
-    </thead>
-  );
-};
-
-Table2.HeaderCell = ({
-  children,
-  className = "",
-  width,
-  disabledSearch = false,
-  ...props
-}) => {
-  const { searches, columnDataKeys } = useContext(TableContext);
-  
-  return (
-    <th
-      className={`
-        px-5 py-3.5 text-left text-[11px] font-semibold
-        uppercase tracking-widest
-        border-r border-slate-700/50 last:border-r-0
-        transition-colors duration-150
-        text-slate-400
-        ${className}
-      `}
-      style={{ width: width || "auto" }}
-      {...props}
-    >
-      <div className="flex items-center gap-2">
-        <span>{children}</span>
+    <th className={`px-3 py-2.5 ${col.className ?? ""} ${col.headerClassName ?? ""}`} style={style}>
+      <div className="relative group">
+        <span className="absolute inset-y-0 left-2.5 flex items-center pointer-events-none text-slate-600 group-focus-within:text-emerald-500 transition-colors duration-150">
+          <SearchIcon />
+        </span>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onSet(col.dataKey, e.target.value)}
+          placeholder="Search..."
+          className="
+            w-full pl-7 pr-7 py-1.5 text-xs font-mono rounded-lg
+            bg-slate-800/80 border text-slate-100 placeholder-slate-600
+            outline-none transition-all duration-150 border-slate-700
+            focus:border-emerald-500/70 focus:ring-2 focus:ring-emerald-500/20
+            hover:border-slate-600
+          "
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onSet(col.dataKey, "")}
+            className="absolute inset-y-0 right-2 flex items-center text-slate-500 hover:text-emerald-400 transition-colors duration-100"
+            aria-label={`Clear ${col.dataKey} filter`}
+          >
+            <ClearIcon />
+          </button>
+        )}
       </div>
     </th>
   );
 };
 
-Table2.Body = ({ children, className = "", isEmpty = false, activeFilterCount = 0, ...props }) => (
-  <tbody className={`divide-y divide-slate-800/70 ${className}`} {...props}>
-    {children}
-    {isEmpty && activeFilterCount > 0 && (
-      <tr>
-        <td colSpan={999} className="px-6 py-14 text-center">
-          <div className="flex flex-col items-center gap-3 text-slate-500">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="1.5" className="text-slate-700">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-            <span className="text-sm">No results match your column filters.</span>
-            <span className="text-xs text-slate-600">Try broadening your search terms.</span>
-          </div>
-        </td>
-      </tr>
-    )}
-  </tbody>
-);
-
-Table2.Row = ({ children, className = "", hover = true, ...props }) => (
-  <tr
-    className={`
-      ${hover ? "hover:bg-slate-800/40" : ""}
-      transition-colors duration-100
-      ${className}
-    `}
-    {...props}
-  >
-    {children}
-  </tr>
-);
-
-Table2.Cell = ({ children, className = "", width, dataKey, ...props }) => {
-  const { registerColumnDataKey } = useContext(TableContext);
-  const cellIndex = useContext(CellIndexContext);
-
-  useEffect(() => {
-    if (dataKey && cellIndex !== undefined) {
-      registerColumnDataKey(dataKey, cellIndex);
-    }
-  }, [dataKey, cellIndex, registerColumnDataKey]);
+// ─── Main <Table /> component ─────────────────────────────────────────────────
+/**
+ * Props:
+ *   columns          ColumnDef[]           — Column definitions
+ *   rows             any[]                 — (visible) rows to render
+ *   startIndex       number                — Offset for row numbering in virtual lists (default 0)
+ *   searches         Record<string,string> — Current search state (from useTableSearches)
+ *   onSearch         (key, val) => void    — Search setter (from useTableSearches)
+ *   isEmpty          boolean               — True when the full filtered set is empty
+ *   activeFilterCount number              — How many column filters are active
+ *   className        string
+ */
+const Table = ({
+  columns = [],
+  rows = [],
+  startIndex = 0,
+  searches = {},
+  onSearch = () => {},
+  isEmpty = false,
+  activeFilterCount = 0,
+  className = "",
+}) => {
+  const hasSearchRow = columns.some(
+    (col) => col.dataKey && col.searchable !== false,
+  );
 
   return (
-    <td
-      className={`
-        px-5 py-4 whitespace-normal text-slate-300 text-sm
-        border-r border-slate-800/60 last:border-r-0
-        ${className}
-      `}
-      style={{ width: width || "auto" }}
-      {...props}
-    >
-      {children}
-    </td>
+    <div className={`overflow-x-auto rounded-xl border border-slate-700/60 shadow-2xl shadow-black/40 ${className}`}>
+      <table className="min-w-full divide-y divide-slate-700/60">
+
+        {/* ── HEAD ─────────────────────────────────────────────────────── */}
+        <thead>
+          {/* Label row */}
+          <tr className="bg-slate-900">
+            {columns.map((col, ci) => (
+              <th
+                key={ci}
+                className={`
+                  px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-widest
+                  border-r border-slate-700/50 last:border-r-0 text-slate-400
+                  ${col.className ?? ""} ${col.headerClassName ?? ""}
+                `}
+                style={{ width: col.width ?? "auto" }}
+              >
+                {col.header}
+              </th>
+            ))}
+          </tr>
+
+          {/* Search row */}
+          {hasSearchRow && (
+            <tr className="bg-slate-950/80 border-t border-slate-800">
+              {columns.map((col, ci) => (
+                <SearchCell
+                  key={ci}
+                  col={col}
+                  value={col.dataKey ? (searches[col.dataKey] ?? "") : ""}
+                  onSet={onSearch}
+                />
+              ))}
+            </tr>
+          )}
+        </thead>
+
+        {/* ── BODY ─────────────────────────────────────────────────────── */}
+        <tbody className="divide-y divide-slate-800/70">
+          {rows.map((row, ri) => (
+            <tr
+              key={row.id ?? ri}
+              className="hover:bg-slate-800/40 transition-colors duration-100"
+            >
+              {columns.map((col, ci) => {
+                const content = col.render
+                  ? col.render(row, startIndex + ri)
+                  : col.dataKey
+                    ? String(resolvePath(row, col.dataKey) ?? "")
+                    : null;
+
+                return (
+                  <td
+                    key={ci}
+                    className={`
+                      px-5 py-4 whitespace-normal text-slate-300 text-sm
+                      border-r border-slate-800/60 last:border-r-0
+                      ${col.className ?? ""} ${col.cellClassName ?? ""}
+                    `}
+                    style={{ width: col.width ?? "auto" }}
+                  >
+                    {content}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+
+          {/* Empty states */}
+          {isEmpty && activeFilterCount > 0 && (
+            <tr>
+              <td colSpan={columns.length} className="px-6 py-14 text-center">
+                <div className="flex flex-col items-center gap-3 text-slate-500">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="1.5" className="text-slate-700">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <span className="text-sm">No results match your column filters.</span>
+                  <span className="text-xs text-slate-600">Try broadening your search terms.</span>
+                </div>
+              </td>
+            </tr>
+          )}
+
+          {isEmpty && activeFilterCount === 0 && rows.length === 0 && (
+            <tr>
+              <td colSpan={columns.length} className="px-6 py-14 text-center">
+                <span className="text-sm text-slate-500">No data to display.</span>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 };
 
-const CellIndexContext = createContext(undefined);
-Table2.Row = ({ children, className = "", hover = true, ...props }) => {
-  return (
-    <tr
-      className={`
-        ${hover ? "hover:bg-slate-800/40" : ""}
-        transition-colors duration-100
-        ${className}
-      `}
-      {...props}
-    >
-      {Children.map(children, (child, index) => {
-        if (isValidElement(child) && child.type === Table2.Cell) {
-          return (
-            <CellIndexContext.Provider value={index}>
-              {child}
-            </CellIndexContext.Provider>
-          );
-        }
-        return child;
-      })}
-    </tr>
-  );
-};
-
-export default Table2;
+export default Table;
