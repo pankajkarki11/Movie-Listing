@@ -7,6 +7,8 @@ import Todo from "./pages/tries/todo";
 import MovieList from "./pages/tries/Ag-gridListing";
 import SimpleTable from "./pages/tries/tanstack";
 import MovieList2 from "./pages/tries/AGList";
+import MovieListV2 from "./pages/ListingV2";
+
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
         <Route path="/table" element={<MovieList />} />
         <Route path="/tanstack" element={<SimpleTable />} />
         <Route path="/ag-grid" element={<MovieList2 />} />
+        <Route path="/movielistv2" element={<MovieListV2 />} />
+    
       </Routes>
     </>
   );
