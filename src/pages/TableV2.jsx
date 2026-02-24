@@ -222,7 +222,7 @@ const Table = ({
                   : col.dataKey
                     ? String(resolvePath(row, col.dataKey) ?? "")
                     : null;
-
+                                                        
                 return (
                   <td
                     key={ci}
